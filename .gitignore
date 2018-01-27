@@ -1,0 +1,16 @@
+# Local configurations
+.git
+.gitconfig
+# Editors
+.idea
+*.sublime-*
+!rofi.sublime-project
+# Generated folders
+.vagrant
+build
+# Personal working files (you might not need these)
+scratch*.*
+README.html
+# Temporary post files; can be unignored later
+*.log
+build
