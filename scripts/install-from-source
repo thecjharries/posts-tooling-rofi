@@ -17,6 +17,8 @@ DEFAULT_SOURCE_DIRECTORY = join('/', 'opt', 'rofi')
 DEFAULT_BUILD_DIRECTORY = join(DEFAULT_SOURCE_DIRECTORY, 'build')
 # Debuggable executable suffix
 DEFAULT_DEBUG_SUFFIX = '-debug'
+# Root installation directory
+DEFAULT_INSTALL_PREFIX = '/usr/local'
 
 # Error codes from git
 ERROR_NOT_A_REPO = 128
@@ -131,13 +133,17 @@ def build(options, is_debuggable=False):
     if is_debuggable:
         commands.append([
             options.configure,
+            "--prefix='%s'" % (options.install_prefix),
             '--enable-timings',
             '--enable-asan',
             '--enable-gcov',
             "--program-suffix='%s'" % (options.debug_suffix),
         ])
     else:
-        commands.append([options.configure])
+        commands.append([
+            options.configure,
+            "--prefix='%s'" % (options.install_prefix),
+        ])
     commands.append(['make'])
     if is_debuggable:
         commands.append(['make', 'CFLAGS=\'-O0 -g3\'', 'clean', 'rofi'])
@@ -236,6 +242,12 @@ def parse_argv(args=None):
         dest='build',
         default=None,
         help="build directory (default %s)" % DEFAULT_BUILD_DIRECTORY
+    )
+    parser.add_argument(
+        '-p', '--prefix',
+        dest='install_prefix',
+        default=DEFAULT_INSTALL_PREFIX,
+        help="root installation directory (default %s)" % DEFAULT_INSTALL_PREFIX
     )
     parser.add_argument(
         '--dry-run',
