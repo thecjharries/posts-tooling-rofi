@@ -264,13 +264,13 @@ def parse_argv(args=None):
         '-u', '--update',
         dest='update',
         action='store_true',
-        help='update using an existing source location'
+        help='update using an existing clone'
     )
     refresh_opts.add_argument(
         '-f', '--force',
         dest='force',
         action='store_true',
-        help='wipes and reinstalls'
+        help='wipes the source directory and clones a fresh copy'
     )
     options = parser.parse_args(args)
     if options.build is None:
