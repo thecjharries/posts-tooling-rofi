@@ -308,11 +308,20 @@ $ awk \\
     '/\smodi/{ print \"\\tmodi: \\\"\"MODI\"\\\";\"; next }{ print }' \\
     $XDG_USER_CONFIG_DIR/rofi/config.rasi
 $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
-2c2
-< /*    modi: \"window,run,ssh\";*/
----
->   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
 """)
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -2 +2 @@
+-/*  modi: \"window,run,ssh\";*/
++    modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
 }}
 
 ### `combi` `modi`
@@ -329,11 +338,20 @@ $ awk \\
     '/combi-modi/{ print \"\\tcombi-modi: \\\"\"MODI\"\\\";\"; next }{ print }' \\
     $XDG_USER_CONFIG_DIR/rofi/config.rasi
 $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
-34c34
-< /*    combi-modi: \"window,run\";*/
----
->   combi-modi: \"keys,combi,drun,ssh,run,windowcd,window\";
 """)
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -34 +34 @@
+-/*  combi-modi: \"window,run\";*/
++    combi-modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
 }}
 
 However, this causes a fairly abrupt segfault.
@@ -356,11 +374,20 @@ $ awk \\
     '/combi-modi/{ print \"\\tcombi-modi: \\\"\"gensub(\"combi,?\", \"\", \"g\", MODI)\"\\\";\"; next }{ print }' \\
     $XDG_USER_CONFIG_DIR/rofi/config.rasi
 $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
-34c34
-< /*    combi-modi: \"window,run\";*/
----
->   combi-modi: \"keys,drun,ssh,run,windowcd,window\";
 """)
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -34 +34 @@
+-/*  combi-modi: \"window,run\";*/
++    combi-modi: \"keys,drun,ssh,run,windowcd,window\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
 }}
 
 ### All the `modi`
@@ -372,7 +399,7 @@ I've combined everything into a script and a `glob`. The first uses a subshell t
 {{
     highlight_block(
         'scripts/discover-and-set-modi',
-        blob_path = 'scripts/install-from-source',
+        blob_path = 'scripts/discover-and-set-modi',
         explicit_lexer_name = 'BashLexer',
         title = 'discover-and-set-modi',
         external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/discover-and-set-modi'
@@ -385,33 +412,41 @@ This can be used as copypasta. Probably.
 
 {{
     shell_session("""\
-$ rofi --help \
-    | awk '
-        BEGIN { modi = \"\"; grabbing = 0 }
-        /Detected modi/ { grabbing = 1; next }
-        !grabbing { next }
-        grabbing && !NF { exit }
-        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi }
-        END { print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \
-    | source /dev/stdin \
-    ; awk \
-        -i inplace \
-        -v INPLACE_SUFFIX='.bak' \
-        -v MODI=\"$DISCOVERED_MODI\" '
-        /\smodi:/ { print \"\tmodi: \\"\"MODI\"\\";\"; next }
-        /combi-modi:/ { print \"\tcombi-modi: \\"\"gensub(\"combi,?\", \"\", \"g\", MODI)\"\\";\"; next }
-        { print }' \
-        \"$XDG_CONFIG_HOME/rofi/config.rasi\" \
-    ; diff \"$XDG_CONFIG_HOME/rofi/config.rasi\"{.bak,}
-2c2
-< /*    modi: \"window,run,ssh\";*/
----
->   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
-34c34
-< /*    combi-modi: \"window,run\";*/
----
->   combi-modi: \"keys,drun,ssh,run,windowcd,window\";
+$ rofi --help \\
+    | awk ' \\
+        BEGIN { modi = \"\"; grabbing = 0 } \\
+        /Detected modi/ { grabbing = 1; next } \\
+        !grabbing { next } \\
+        grabbing && !NF { exit } \\
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
+        END { print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \\
+    | source /dev/stdin \\
+    ; awk \\
+        -i inplace \\
+        -v INPLACE_SUFFIX='.bak' \\
+        -v MODI=\"$DISCOVERED_MODI\" ' \\
+        /\smodi:/ { print \"\tmodi: \\\"\"MODI\"\\\";\"; next } \\
+        /combi-modi:/ { print \"\tcombi-modi: \\\"\"gensub(\"combi,?\", \"\", \"g\", MODI)\"\\\";\"; next } \\
+        { print }' \\
+        \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\" \\
+    ; diff \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
 """)
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -2 +2 @@
+-/*  modi: \"window,run,ssh\";*/
++    modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+@@ -34 +34 @@
+-/*  combi-modi: \"window,run\";*/
++    combi-modi: \"keys,drun,ssh,run,windowcd,window\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
 }}
 
 {% endblock %}
