@@ -239,8 +239,9 @@ Its help provides a good overview:
 {{
     shell_session("""\
 $ ./install-from-source --help
-usage: install-from-source [-h] [-d SOURCE] [-b BUILD] [--dry-run]
-                           [--skip-debug | -s DEBUG_SUFFIX] [-u | -f]
+usage: install-from-source [-h] [-d SOURCE] [-b BUILD] [-p INSTALL_PREFIX]
+                           [--dry-run] [--skip-debug | -s DEBUG_SUFFIX]
+                           [-u | -f]
 
 Installs rofi from source
 
@@ -250,12 +251,15 @@ optional arguments:
                         source directory (default /opt/rofi)
   -b BUILD, --build-directory BUILD
                         build directory (default /opt/rofi/build)
+  -p INSTALL_PREFIX, --prefix INSTALL_PREFIX
+                        root installation directory (default /usr/local)
   --dry-run             dry run
   --skip-debug          skip the debuggable build
   -s DEBUG_SUFFIX, --debug-suffix DEBUG_SUFFIX
                         debug suffix, (default -debug, e.g. rofi-debug)
-  -u, --update          update using an existing source location
-  -f, --force           wipes and reinstalls
+  -u, --update          update using an existing clone
+  -f, --force           wipes the source directory and clones a fresh copy
+
 """)
 }}
 
