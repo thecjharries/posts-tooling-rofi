@@ -363,6 +363,57 @@ $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
 """)
 }}
 
+### All the `modi`
+
+I've combined everything into a script and a `glob`. The first uses a subshell to discover available `modi` whereas the second `pipe`s and `source`s. The result should be the same.
+
+#### Shell Script
+
+{{
+    highlight_block(
+        'scripts/discover-and-set-modi',
+        blob_path = 'scripts/install-from-source',
+        explicit_lexer_name = 'BashLexer',
+        title = 'discover-and-set-modi',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/discover-and-set-modi'
+    )
+}}
+
+#### `glob`
+
+This can be used as copypasta. Probably.
+
+{{
+    shell_session("""\
+$ rofi --help \
+    | awk '
+        BEGIN { modi = \"\"; grabbing = 0 }
+        /Detected modi/ { grabbing = 1; next }
+        !grabbing { next }
+        grabbing && !NF { exit }
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi }
+        END { print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \
+    | source /dev/stdin \
+    ; awk \
+        -i inplace \
+        -v INPLACE_SUFFIX='.bak' \
+        -v MODI=\"$DISCOVERED_MODI\" '
+        /\smodi:/ { print \"\tmodi: \\"\"MODI\"\\";\"; next }
+        /combi-modi:/ { print \"\tcombi-modi: \\"\"gensub(\"combi,?\", \"\", \"g\", MODI)\"\\";\"; next }
+        { print }' \
+        \"$XDG_CONFIG_HOME/rofi/config.rasi\" \
+    ; diff \"$XDG_CONFIG_HOME/rofi/config.rasi\"{.bak,}
+2c2
+< /*    modi: \"window,run,ssh\";*/
+---
+>   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+34c34
+< /*    combi-modi: \"window,run\";*/
+---
+>   combi-modi: \"keys,drun,ssh,run,windowcd,window\";
+""")
+}}
+
 `awk` provides a convenient way to skip lines via `next`. We don't care about the majority of the input, so we can quickly jump to the next record when
 
 {{
