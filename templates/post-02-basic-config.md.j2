@@ -313,8 +313,53 @@ $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
 """)
 }}
 
+### `combi` `modi`
 
+This process is almost identical to [`-show`-able `modi`](#showablemodi), so I'll skip the `awk` breakdown. The `combi` `modi` combines multiple `modi` into a single instance. This allows us to group multiple modes together by default.
 
+The simplest solution would be to repeat exactly what we did above.
+{{
+    shell_session("""\
+$ awk \\
+    -i inplace \\
+    -v INPLACE_SUFFIX='.bak' \\
+    -v MODI=\"$DISCOVERED_MODI\" \\
+    '/combi-modi/{ print \"\\tcombi-modi: \\\"\"MODI\"\\\";\"; next }{ print }' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
+34c34
+< /*    combi-modi: \"window,run\";*/
+---
+>   combi-modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+""")
+}}
+
+However, this causes a fairly abrupt segfault.
+
+{{
+    shell_session("""\
+$ rofi -show combi
+[1]    1269 segmentation fault (core dumped)  rofi -show combi
+""")
+}}
+
+The problem is straight-forward to debug. `combi` loads the provided list of `modi`. Since `combi` contains itself, it tries to load itself. Ad infinitum. It's also straight-forward to fix.
+
+{{
+    shell_session("""\
+$ awk \\
+    -i inplace \\
+    -v INPLACE_SUFFIX='.bak' \\
+    -v MODI=\"$DISCOVERED_MODI\" \\
+    '/combi-modi/{ print \"\\tcombi-modi: \\\"\"gensub(\"combi,?\", \"\", \"g\", MODI)\"\\\";\"; next }{ print }' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
+34c34
+< /*    combi-modi: \"window,run\";*/
+---
+>   combi-modi: \"keys,drun,ssh,run,windowcd,window\";
+""")
+}}
 
 `awk` provides a convenient way to skip lines via `next`. We don't care about the majority of the input, so we can quickly jump to the next record when
 
