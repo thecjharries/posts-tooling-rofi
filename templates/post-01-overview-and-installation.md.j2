@@ -225,15 +225,85 @@ $ rofi-debug --help
 
 ## Easy Mode
 
-I've collected everything in a simple installation script. Pull requests are absolutely welcome.
+I've collected everything in [a simple installation script](#fullscript). Pull requests are absolutely welcome.
+
+{{
+    shell_session("""\
+$ curl -fLo ./install-from-source https://raw.githubusercontent.com/thecjharries/posts-tooling-rofi/feature/post-01-overview-and-installation/scripts/install-from-source
+$ chmod +x ./install-from-source
+""")
+}}
+
+Its help provides a good overview:
+
+{{
+    shell_session("""\
+$ ./install-from-source --help
+usage: install-from-source [-h] [-d SOURCE] [-b BUILD] [--dry-run]
+                           [--skip-debug | -s DEBUG_SUFFIX] [-u | -f]
+
+Installs rofi from source
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d SOURCE, --source-directory SOURCE
+                        source directory (default /opt/rofi)
+  -b BUILD, --build-directory BUILD
+                        build directory (default /opt/rofi/build)
+  --dry-run             dry run
+  --skip-debug          skip the debuggable build
+  -s DEBUG_SUFFIX, --debug-suffix DEBUG_SUFFIX
+                        debug suffix, (default -debug, e.g. rofi-debug)
+  -u, --update          update using an existing source location
+  -f, --force           wipes and reinstalls
+""")
+}}
+
+I used Python's APIs for directory manipulation, which means you'll have to run it as the user that owns the `source` and `build` directories. `sudo` is required for the default `/opt/rofi` location. This means the whole script is run as `root`. For example,
+
+{{
+    shell_session("""\
+$ stat -c '%A %U %G' /opt
+drwxr-xr-x root root
+$ sudo ./install-from-source
+""")
+}}
+
+If that makes you nervous (it should), you can build it in a temporary directory. You'll have to manage the source code yourself (e.g. updates).
+
+{{
+    shell_session("""\
+$ ./install-from-source -d $(mktemp -d)
+""")
+}}
+
+I'm a fan of the debug mode, so the script installs both side-by-side. It triples the installation size, bringing the total installation size to `~5M`, up from `~1.5M`.
+
+{{
+    shell_session("""\
+$ ls -l --human-readable | grep rofi
+-rwxr-xr-x. 1 root root 1.4M Jan 27 13:42 rofi
+-rwxr-xr-x. 1 root root 3.3M Jan 27 13:43 rofi-debug
+-rwxr-xr-x. 1 root root  755 Jan 27 13:42 rofi-sensible-terminal
+-rwxr-xr-x. 1 root root  755 Jan 27 13:43 rofi-sensible-terminal-debug
+-rwxr-xr-x. 1 root root 5.0K Jan 27 13:42 rofi-theme-selector
+-rwxr-xr-x. 1 root root 5.0K Jan 27 13:43 rofi-theme-selector-debug
+""")
+}}
+
+If that's too big, or you don't see yourself doing much debugging (honestly you probably won't), the `--skip-debug` flag will just install plain `rofi` without debug features.
+
+### Full Script
 
 {{
     highlight_block(
         'scripts/install-from-source',
         blob_path = 'scripts/install-from-source',
         explicit_lexer_name = 'PythonLexer',
-        title = "install-from-source",
-        external_source_link = "https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/install-from-source"
+        title = 'install-from-source',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/install-from-source'
     )
 }}
+
+
 {% endblock %}
