@@ -1,0 +1,297 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post looks at some simple `rofi` configuration.
+
+{% endblock %}
+{% block content %}
+## Config File
+
+At the momemnt, `rofi` is using default values and (probably) refers to a config file that doesn't exist.
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk -F':' '/Configuration/{ print \"cat \"$2 }' \\
+    | . /dev/stdin
+
+cat: /home/cjharries/.config/rofi/config: No such file or directory
+""")
+}}
+
+`rofi` provides a couple of ways [to load config](https://github.com/DaveDavenport/rofi/blob/1.4.2/doc/rofi.1.markdown#configuration) (plus templating it for new users). We'll need to create the user directory via `$XDG_USER_CONFIG_DIR` first:
+
+{{
+    shell_session("""\
+$ echo $XDG_USER_CONFIG_DIR || echo \"export XDG_USER_CONFIG_DIR=/path/to/desired/.config\" >> ~/.whateverrc && source ~/.whateverrc
+$ mkdir -p $XDG_USER_CONFIG_DIR/rofi
+""")
+}}
+
+Since we're running `>=1.4`, we can use [the new config format](https://github.com/DaveDavenport/rofi/blob/1.4.2/doc/rofi-theme.5.markdown).
+
+{{
+    shell_session("""\
+$ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+We've now got a super basic config file that contains every possible option (I think) commented out.
+
+{{
+    shell_session("""\
+$ rm -rf $XDG_USER_CONFIG_DIR/rofi/config*
+$ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+#### Script Modi Discovery
+
+If you look at the `man` page or check `rofi`'s help, you'll probably notice that not all the modis are enabled. You can also force the issue by attempting to `-show` a nonexistent modi:
+
+{{
+    shell_session("""\
+$ rofi -show qqq
+Mode qqq is not found.
+The following modi are known:
+        * +window
+        * windowcd
+        * +run
+        * +ssh
+        * drun
+        * combi
+        * keys
+""")
+}}
+
+A safer way to discover modi, on the off-chance you're running a `qqq` modi, is to check the tail end of `rofi --help`.
+
+Using the default config, the currently enabled modi are as follows:
+
+{{
+    shell_session("""\
+$ grep -E '\smodi:' $XDG_USER_CONFIG_DIR/rofi/config.rasi
+/*      modi: \"window,run,ssh\";*/
+""")
+}}
+
+The definition is pretty simple. It's just a comma-separated list of modi inside a string. Since `rofi` gives provides a convenient list of accessible modi, we have two choices:
+
+1. manually pick desired modi and manually update the config like a peasant, or
+2. stream the whole thing directly from the help into the config.
+
+Of course, you could probably finish #1 before you get done reading the following code breakdown, but where's the fun in that?
+
+The first thing we have to do is parse the list of available modi. At the moment, it looks like help [leads the list with `Detected modi`](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L287), prints [modi name and active state](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L248), and finishes [with an empty line](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L289). The rest of the help file isn't useful here. We're going to have to parse essentially the entire thing, since the pertinent help appears at the bottom. `sed` would be an okay solution, printing only the lines we're interested in and manipulating them. However, we'd have to pipe those results into something else to clean them up for use as a single-line string.
+
+`awk`, on the other hand, will let us parse the file and manipulate the return as needed. To start, let's declare a list of modi and a flag that can be used to determine whether or not the list of modi has started. `awk`'s `BEGIN` section is only run once, at the beginning of the input.
+
+{{
+    highlight_block("""\
+BEGIN {
+    modi = \"\";
+    grabbing = 0;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+We'll need some way to let `awk` know when we should start grabbing. `next` lets us skip to the next record without processing anything else.
+
+{{
+    highlight_block("""\
+/Detected modi/ {
+    grabbing = 1;
+    next;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+If we're not `grabbing`, there's no reason to process any of the other conditionals.
+
+{{
+    highlight_block("""\
+!grabbing {
+    next;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+Once we are grabbing, we should stop when we hit a line with no fields. The `NF` magic variable counts the number of fields per record. The `exit` command will shoot us either to the `END` of the `awk` script, skipping any remaining records.
+
+{{
+    highlight_block("""\
+grabbing && !NF {
+    exit;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+If we are grabbing and we have records, they're going to look something like this:
+
+{{
+    highlight_block("""\
+        * +window
+""",
+        explicit_lexer_name = 'TextLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+That means the numbered inputs look something like this:
+
+{{
+    highlight_block("""\
+$0:         * +window
+$1: *
+$2: +window
+""",
+        explicit_lexer_name = 'TextLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+So we want to consume `$2`, except we don't want `+`. `gsub` will replace any instance of a pattern in the record. String concantenation you should already understand; `awk` just glues things together without the need for extra operators.
+
+{{
+    highlight_block("""\
+grabbing {
+    gsub(\"+\", \"\");
+    modi = $2\",\"modi;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+Finally, at the tail end of the script, we want to print what we've found. Similar to the `BEGIN` block, the `END` block is run once, after all the records are processed (or `exit` is called). `gensub` takes a pattern, a replacement, the method, and input string. If you'll notice above, we're going to have an extra trailing comma at the end of `modi`.
+
+{{
+    highlight_block("""\
+END {
+    print gensub(\",$\", \"\", \"g\", modi);
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+
+At this point, we could do something like this:
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk '\\
+        BEGIN{ modi = \"\"; grabbing = 0 } \\
+        /Detected modi/{ grabbing = 1; next } \\
+        !grabbing { next } \\
+        grabbing && !NF { exit } \\
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
+        END{ print gensub(\",$\",\"\",\"g\",modi) }'
+keys,combi,drun,ssh,run,windowcd,window
+""")
+}}
+
+However, that means we'd have to manually copy that and manually paste it into out config. Like a peasant. Or we could stream it. Guess what I want to do.
+
+We have a small problem. (Or rather, I have a small problem, possibly related to my lack of `bash` knowledge.) `awk` dumps to `/dev/stdout`. That means consuming `awk` has to be done in a subshell, which is kinda boring, or `source`d (sorta), which is exotic (**AND POTENTIALLY VERY DANGEROUS**). I personally prefer creating variables, rather than throwing together a hot mess of nested subshells. Coming from JavaScript, I'm very wary of callback hell.
+
+We can easily modify what we've written so far to dump a variable instead of a simple string.
+
+{{
+    highlight_block("""\
+END {
+    print \"DISCOVERED_MODI=\"gensub(\",$\", \"\", \"g\", modi);
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'available-modi-parser snippet'
+    )
+}}
+
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk '\\
+        BEGIN{ modi = \"\"; grabbing = 0 } \\
+        /Detected modi/{ grabbing = 1; next } \\
+        !grabbing { next } \\
+        grabbing && !NF { exit } \\
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
+        END{ print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }'
+DISCOVERED_MODI=keys,combi,drun,ssh,run,windowcd,window
+""")
+}}
+
+Consuming this is as simple as `source`ing the pipe.
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk '\\
+        BEGIN{ modi = \"\"; grabbing = 0 } \\
+        /Detected modi/{ grabbing = 1; next } \\
+        !grabbing { next } \\
+        grabbing && !NF { exit } \\
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
+        END{ print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \\
+    | source /dev/stdin \\
+    ; echo $DISCOVERED_MODI
+keys,combi,drun,ssh,run,windowcd,window
+""")
+}}
+
+We'll need to figure out which config option we want to modify:
+
+{{
+    shell_session("""\
+$ cat $XDG_CONFIG_HOME/rofi/config.rasi | grep modi
+/*  modi: \"window,run,ssh\";*/
+/*  combi-modi: \"window,run\";*/
+""")
+}}
+
+I'm going to leave `combi-modi` for another `rofi` post.
+
+
+`awk` provides a convenient way to skip lines via `next`. We don't care about the majority of the input, so we can quickly jump to the next record when
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk '\\
+        BEGIN{ modi = \"\"; grabbing = 0 } \\
+        /Detected modi/{ grabbing = 1; next } \\
+        !grabbing { next } \\
+        grabbing && !NF { exit } \\
+        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
+        END{ print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \\
+    | . /dev/stdin \\
+    ; sed --in-place='.bak' -E \"s/^.*?(\s+)modi:.*?$/\1modi: \\\"$DISCOVERED_MODI\\\";/g\" $XDG_CONFIG_HOME/rofi/config.rasi \\
+    ; diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
+
+2c2
+<   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+---
+> /*    modi: \"window,run,ssh\";*/
+""")
+}}
+
+{% endblock %}
