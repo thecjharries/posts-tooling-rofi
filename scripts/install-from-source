@@ -234,7 +234,7 @@ def parse_argv(args=None):
     parser.add_argument(
         '-b', '--build-directory',
         dest='build',
-        default=DEFAULT_BUILD_DIRECTORY,
+        default=None,
         help="build directory (default %s)" % DEFAULT_BUILD_DIRECTORY
     )
     parser.add_argument(
@@ -272,7 +272,10 @@ def parse_argv(args=None):
         action='store_true',
         help='wipes and reinstalls'
     )
-    return parser.parse_args(args)
+    options = parser.parse_args(args)
+    if options.build is None:
+        options.build = join(options.source, 'build')
+    return options
 
 
 def cli():
