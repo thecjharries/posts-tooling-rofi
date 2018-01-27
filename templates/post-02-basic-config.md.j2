@@ -414,27 +414,4 @@ $ rofi --help \
 """)
 }}
 
-`awk` provides a convenient way to skip lines via `next`. We don't care about the majority of the input, so we can quickly jump to the next record when
-
-{{
-    shell_session("""\
-$ rofi --help \\
-    | awk '\\
-        BEGIN{ modi = \"\"; grabbing = 0 } \\
-        /Detected modi/{ grabbing = 1; next } \\
-        !grabbing { next } \\
-        grabbing && !NF { exit } \\
-        grabbing { gsub(\"+\",\"\"); modi = $2\",\"modi } \\
-        END{ print \"DISCOVERED_MODI=\"gensub(\",$\",\"\",\"g\",modi) }' \\
-    | . /dev/stdin \\
-    ; sed --in-place='.bak' -E \"s/^.*?(\s+)modi:.*?$/\1modi: \\\"$DISCOVERED_MODI\\\";/g\" $XDG_CONFIG_HOME/rofi/config.rasi \\
-    ; diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
-
-2c2
-<   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
----
-> /*    modi: \"window,run,ssh\";*/
-""")
-}}
-
 {% endblock %}
