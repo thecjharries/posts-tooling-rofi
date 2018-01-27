@@ -281,13 +281,14 @@ I'm a fan of the debug mode, so the script installs both side-by-side. It triple
 
 {{
     shell_session("""\
-$ ls -l --human-readable | grep rofi
--rwxr-xr-x. 1 root root 1.4M Jan 27 13:42 rofi
--rwxr-xr-x. 1 root root 3.3M Jan 27 13:43 rofi-debug
--rwxr-xr-x. 1 root root  755 Jan 27 13:42 rofi-sensible-terminal
--rwxr-xr-x. 1 root root  755 Jan 27 13:43 rofi-sensible-terminal-debug
--rwxr-xr-x. 1 root root 5.0K Jan 27 13:42 rofi-theme-selector
--rwxr-xr-x. 1 root root 5.0K Jan 27 13:43 rofi-theme-selector-debug
+$ find /usr/local -type f -name 'rofi*' -exec stat -c %s {} + \\
+    | awk '{ total+=$1 }END{ print total }' \\
+    | numfmt --to=iec
+4.8M
+$ find /usr/local -type f -name 'rofi*' -not -name '*debug' -exec stat -c %s {} + \\
+    | awk '{ total+=$1 }END{ print total }' \\
+    | numfmt --to=iec
+1.5M
 """)
 }}
 
