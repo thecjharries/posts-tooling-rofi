@@ -45,7 +45,7 @@ $ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
 """)
 }}
 
-#### Script Modi Discovery
+## Script Modi Discovery
 
 If you look at the `man` page or check `rofi`'s help, you'll probably notice that not all the modis are enabled. You can also force the issue by attempting to `-show` a nonexistent modi:
 
@@ -225,7 +225,6 @@ END {
     )
 }}
 
-
 {{
     shell_session("""\
 $ rofi --help \\
@@ -268,7 +267,53 @@ $ cat $XDG_CONFIG_HOME/rofi/config.rasi | grep modi
 """)
 }}
 
-I'm going to leave `combi-modi` for another `rofi` post.
+
+### `-show`-able `modi`
+
+To edit the config, we'll have to parse the existing config line-by-line and update the desired values. `sed` is the go-to, but, once again, `awk` offers a couple of features that are useful here:
+
+1. `bash` variable expansion is much easier (i.e. less messy) with `awk`, and
+2. manipulating multiple things at the same time is a bit easier.
+
+The first thing we want to do is limit ourselves to the `-show`-able `modi` config:
+
+{{
+    shell_session("""\
+$ cat $XDG_CONFIG_HOME/rofi/config.rasi \\
+    | awk '/\smodi/{ print }'
+/*  modi: \"window,run,ssh\";*/
+""")
+}}
+
+Since we've built a desired list of `modi`, `$DISCOVERED_MODI`, we can simply replace the line. We can set variables in `awk` via `-v` By default, the file uses tab characters (`\t`) to align entries, so we'll need to lead with that.
+
+{{
+    shell_session("""\
+$ cat $XDG_CONFIG_HOME/rofi/config.rasi \\
+    | awk -v MODI=\"$DISCOVERED_MODI\" '/\smodi/{ print \"\\tmodi: \\\"\"MODI\"\\\";\" }'
+    modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+""")
+}}
+
+Provided `awk` is `>=4.1`, we can [edit streams `inplace`](https://www.gnu.org/software/gawk/manual/html_node/Extension-Sample-Inplace.html). We'll need to modify the script to `print` any unmatched lines as well.
+
+{{
+    shell_session("""\
+$ awk \\
+    -i inplace \\
+    -v INPLACE_SUFFIX='.bak' \\
+    -v MODI=\"$DISCOVERED_MODI\" \\
+    '/\smodi/{ print \"\\tmodi: \\\"\"MODI\"\\\";\"; next }{ print }' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
+2c2
+< /*    modi: \"window,run,ssh\";*/
+---
+>   modi: \"keys,combi,drun,ssh,run,windowcd,window\";
+""")
+}}
+
+
 
 
 `awk` provides a convenient way to skip lines via `next`. We don't care about the majority of the input, so we can quickly jump to the next record when
