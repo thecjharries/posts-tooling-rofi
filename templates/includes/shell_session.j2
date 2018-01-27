@@ -1,0 +1,14 @@
+{% macro shell_session(contents) %}
+{# TODO: PowerShell support #}
+
+{{
+    highlight_block(
+        contents,
+        raw = contents,
+        linenos = False,
+        explicit_lexer_name = 'BashSessionLexer',
+        no_header = True
+    )
+}}
+
+{% endmacro %}

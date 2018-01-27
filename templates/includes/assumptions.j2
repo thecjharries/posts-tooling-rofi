@@ -1,0 +1,14 @@
+## Assumptions
+
+I'm running Fedora 27. Most of the instructions are based on that OS. This will translate fairly well to other RHEL derivatives. The Debian ecosystem should also work fairly well, albeit with totally different package names. This probably won't work at all on Windows, and I have no intention of fixing that.
+
+{% if post_number > 1 %}
+You're going to need a newer version of `rofi`, `>=1.4`. I'm currently running this:
+{{
+    shell_session("""\
+$ rofi -version
+Version: 1.4.2-131-git-5c5665ef (next)
+""")
+}}
+If you [installed from source](https://blog.wizardsoftheweb.pro/rofi-overview#installation), you should be good to go.
+{% endif %}
