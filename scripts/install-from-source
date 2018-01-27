@@ -241,7 +241,7 @@ def parse_argv(args=None):
         '-b', '--build-directory',
         dest='build',
         default=None,
-        help="build directory (default %s)" % DEFAULT_BUILD_DIRECTORY
+        help='build directory (default <source path>/build)'
     )
     parser.add_argument(
         '-p', '--prefix',
