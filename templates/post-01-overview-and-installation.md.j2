@@ -1,0 +1,314 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post provides a `rofi` overview and installation instructions.
+
+{% endblock %}
+{% block content %}
+## Overview
+
+`rofi` makes it really easy to do things via simple shortcuts. It's super useful if you're trying to up your nerd cred, streamline your workflow, beef up `i3`, or make Linux that much more pleasant to run.
+
+Rather than make my own shoddy feature list, I'm just going to link [the official docs](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md), whose screenshots are already very pretty. `rofi` can, among other things, do this stuff:
+
+* [switch windows](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#window-switcher),
+* [launch applications](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#application-launcher),
+* [launch `.desktop` applications](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#desktop-file-application-launcher),
+* [run `ssh` via `~/.ssh/config`](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#ssh-launcher),
+* [run scripts](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#script-mode), and
+* [replace `dmenu`](https://github.com/DaveDavenport/rofi/blob/1.4.2/README.md#dmenu-replacement) (with more features!).
+
+It also does a few more things that I'll probably explore later.
+
+## Installation
+
+Instructions were mostly sourced from [the official docs](https://github.com/DaveDavenport/rofi/blob/1.4.2/INSTALL.md). I tweaked a couple of things and made sure everything worked easily on Fedora.
+
+I tested installation from start to finish in a fresh Vagrant box.
+
+{{
+    shell_session("""\
+$ vagrant init fedora/27-cloud-base
+""")
+}}
+
+I'm (mostly) certain everything will work there. Unless you configure the box to handle or pass off `X` events, you won't actually be able to view `rofi` via Vagrant, but you can ensure the build process works as intended.
+
+### Dependencies
+
+I make heavy use of [`bash`'s brace expansion](https://www.gnu.org/software/bash/manual/html_node/Brace-Expansion.html). If you're not using `bash`, I'm sorry. To make things easier, I'll turn on debug mode.
+
+{{
+    shell_session("""\
+$ set -x
+""")
+}}
+
+Install build dependencies.
+
+{{
+    shell_session("""\
+$ sudo dnf install -y gcc make auto{conf,make} pkg-config flex bison git
++ sudo dnf install -y gcc make autoconf automake pkg-config flex bison git
+""")
+}}
+
+Install external libraries.
+
+{{
+    shell_session("""\
+$ sudo dnf install -y {pango,cairo,glib2,lib{rsvg2,xkbcommon{,-x11},xcb},startup-notification,xcb-util{,-{w,xr}m},check}{,-devel}
++ sudo dnf install -y pango pango-devel cairo cairo-devel glib2 glib2-devel librsvg2 librsvg2-devel libxkbcommon libxkbcommon-devel libxkbcommon-x11 libxkbcommon-x11-devel libxcb libxcb-devel startup-notification startup-notification-devel xcb-util xcb-util-devel xcb-util-wm xcb-util-wm-devel xcb-util-xrm xcb-util-xrm-devel check check-devel
+""")
+}}
+
+(Optional) Install [debugging](#debuggable) dependencies.
+
+{{
+    shell_session("""\
+$ sudo dnf install -y libasan
++ sudo dnf install -y libasan
+""")
+}}
+
+There are no more brace expansions.
+{{
+    shell_session("""\
+$ set +x
+""")
+}}
+
+### Source Code
+We'll need to get a current copy of the source.
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code
+$ git clone https://github.com/DaveDavenport/rofi --recursive
+$ cd rofi
+""")
+}}
+
+Alternatively, if you've already got a clone of the repo, just update it.
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code/rofi
+$ git reset --hard
+$ git pull
+$ git submodule init && git submodule update
+$ rm -rf build
+""")
+}}
+
+Finally, rebuild the tooling and create a build directory.
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code/rofi
+$ autoreconf -i
+$ mkdir build && cd build
+""")
+}}
+
+### Options
+
+It's useful to check out the current build options to understand what's going on.
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code/rofi/build
+$ ../configure --help
+""")
+}}
+
+For example, by default, `rofi` is installed to `/usr/local`, which means the final product will do this:
+
+{{
+    shell_session("""\
+$ which rofi
+/usr/local/bin/rofi
+""")
+}}
+
+You can change that in the next steps via
+
+{{
+    shell_session("""\
+$ ../configure --prefix=/some/other/path
+""")
+}}
+
+If you're using Fedora 27+, you shouldn't need to adjust any of the options. Older Fedora (and probably CentOS) might require some tweaking. Debian derivatives will also require tweaking.
+
+### Standard
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code/rofi/build
+$ ../configure
+
+...
+
+-------------------------------------
+Timing output:               Disabled
+Desktop File drun dialog     Enabled
+Window Switcher dialog       Enabled
+Asan address sanitize        Disabled
+Code Coverage                Disabled
+Check based tests            Enabled
+-------------------------------------
+Now type 'make' to build
+""")
+}}
+
+If you're missing some of these options, you'll need to wade through the `configure` log and figure out which libraries are missing.
+
+{{
+    shell_session("""\
+$ make
+...
+$ sudo make install
+...
+$ which rofi
+/usr/local/bin/rofi
+$ rofi --help
+""")
+}}
+
+### Debuggable
+
+If you're fighting issues, or want to see how things work, you can also build `rofi` with some debugging options. You can either replace the existing `rofi` or you can install them side-by-side using the `--program-suffix` installation option (which is what I do below). More information can be found [in the official debugging docs](https://github.com/DaveDavenport/rofi/wiki/Debugging-Rofi)
+
+{{
+    shell_session("""\
+$ cd /desired/path/for/source/code/rofi/build
+$ ../configure \\
+    --enable-timings \\
+    --enable-asan \\
+    --enable-gcov \\
+    --program-suffix='-debug'
+
+...
+
+-------------------------------------
+Timing output:               Enabled
+Desktop File drun dialog     Enabled
+Window Switcher dialog       Enabled
+Asan address sanitize        Enabled
+Code Coverage                Enabled
+Check based tests            Enabled
+-------------------------------------
+Now type 'make' to build
+""")
+}}
+
+If you're missing some of these options, you'll need to wade through the `configure` log and figure out which libraries are missing.
+
+I'd be lying if I said I fully understand the debug build. I had to first `make` without debug symbols, then re`make` with debug symbols. Without the initial `make`, a couple of important headers aren't built, and I wasn't able to trace how to `make` just those files (`rofi` has a fairly involved build process and I'm weak at best with the GNU build system).
+
+{{
+    shell_session("""\
+$ make
+...
+$ make CFLAGS='-O0 -g3' clean rofi
+...
+$ sudo make install
+...
+$ which rofi
+/usr/local/bin/rofi
+$ which rofi-debug
+/usr/local/bin/rofi-debug
+$ rofi-debug --help
+""")
+}}
+
+## Easy Mode
+
+I've collected everything in [a simple installation script](#fullscript). Pull requests are absolutely welcome.
+
+{{
+    shell_session("""\
+$ curl -fLo ./install-from-source https://raw.githubusercontent.com/thecjharries/posts-tooling-rofi/feature/post-01-overview-and-installation/scripts/install-from-source
+$ chmod +x ./install-from-source
+""")
+}}
+
+Its help provides a good overview:
+
+{{
+    shell_session("""\
+$ ./install-from-source --help
+usage: install-from-source [-h] [-d SOURCE] [-b BUILD] [-p INSTALL_PREFIX]
+                           [--dry-run] [--skip-debug | -s DEBUG_SUFFIX]
+                           [-u | -f]
+
+Installs rofi from source
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d SOURCE, --source-directory SOURCE
+                        source directory (default /opt/rofi)
+  -b BUILD, --build-directory BUILD
+                        build directory (default /opt/rofi/build)
+  -p INSTALL_PREFIX, --prefix INSTALL_PREFIX
+                        root installation directory (default /usr/local)
+  --dry-run             dry run
+  --skip-debug          skip the debuggable build
+  -s DEBUG_SUFFIX, --debug-suffix DEBUG_SUFFIX
+                        debug suffix, (default -debug, e.g. rofi-debug)
+  -u, --update          update using an existing clone
+  -f, --force           wipes the source directory and clones a fresh copy
+
+""")
+}}
+
+I used Python's APIs for directory manipulation, which means you'll have to run it as the user that owns the `source` and `build` directories. `sudo` is required for the default `/opt/rofi` location. This means the whole script is run as `root`. For example,
+
+{{
+    shell_session("""\
+$ stat -c '%A %U %G' /opt
+drwxr-xr-x root root
+$ sudo ./install-from-source
+""")
+}}
+
+If that makes you nervous (it should), you can build it in a temporary directory. You'll have to manage the source code yourself (e.g. updates).
+
+{{
+    shell_session("""\
+$ ./install-from-source -d $(mktemp -d)
+""")
+}}
+
+I'm a fan of the debug mode, so the script installs both side-by-side. It triples the installation size, bringing the total installation size to `~5M`, up from `~1.5M`.
+
+{{
+    shell_session("""\
+$ find /usr/local -type f -name 'rofi*' -exec stat -c %s {} + \\
+    | awk '{ total+=$1 }END{ print total }' \\
+    | numfmt --to=iec
+4.8M
+$ find /usr/local -type f -name 'rofi*' -not -name '*debug' -exec stat -c %s {} + \\
+    | awk '{ total+=$1 }END{ print total }' \\
+    | numfmt --to=iec
+1.5M
+""")
+}}
+
+If that's too big, or you don't see yourself doing much debugging (honestly you probably won't), the `--skip-debug` flag will just install plain `rofi` without debug features.
+
+### Full Script
+
+{{
+    highlight_block(
+        'scripts/install-from-source',
+        blob_path = 'scripts/install-from-source',
+        explicit_lexer_name = 'PythonLexer',
+        title = 'install-from-source',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/install-from-source'
+    )
+}}
+
+
+{% endblock %}

@@ -1,0 +1,306 @@
+#!/usr/bin/env python
+
+# pylint: disable=misplaced-comparison-constant,missing-docstring
+
+from errno import EEXIST, ENOENT
+from os import chdir, makedirs
+from os.path import join
+from shutil import rmtree
+from subprocess import CalledProcessError, call
+from sys import argv, exit as sys_exit
+
+from argparse import ArgumentParser
+
+# Directory for source code
+DEFAULT_SOURCE_DIRECTORY = join('/', 'opt', 'rofi')
+# Directory for build artifacts
+DEFAULT_BUILD_DIRECTORY = join(DEFAULT_SOURCE_DIRECTORY, 'build')
+# Debuggable executable suffix
+DEFAULT_DEBUG_SUFFIX = '-debug'
+# Root installation directory
+DEFAULT_INSTALL_PREFIX = '/usr/local'
+
+# Error codes from git
+ERROR_NOT_A_REPO = 128
+ERROR_NOT_EMPTY = 128
+
+# Tooling dependencies
+BUILD_DEPENDENCIES = [
+    'gcc',
+    'make',
+    'autoconf',
+    'automake',
+    'pkg-config',
+    'flex',
+    'bison',
+    'git',
+]
+
+# External libraries
+EXTERNAL_DEPENDENCIES = [
+    'pango',
+    'cairo',
+    'glib2',
+    'librsvg2',
+    'libxkbcommon',
+    'libxkbcommon-x11',
+    'libxcb',
+    'startup-notification',
+    'xcb-util',
+    'xcb-util-wm',
+    'xcb-util-xrm',
+    'check',
+]
+
+# External libraries + headers
+DEVEL_DEPENDENCIES = EXTERNAL_DEPENDENCIES + [
+    dependency + '-devel' for dependency in EXTERNAL_DEPENDENCIES
+]
+
+# Debug-only dependencies
+DEBUG_DEPENDENCIES = [
+    'libasan'
+]
+
+
+def run_commands(commands, dry_run=False):
+    """Executes a list of commands via call"""
+    for command in commands:
+        print ' '.join(command)
+        if not dry_run:
+            call(command)
+
+
+def cd(directory_path, dry_run=False):  # pylint: disable=invalid-name
+    """Change directory"""
+    if dry_run:
+        print "cd %s" % directory_path
+    else:
+        chdir(directory_path)
+
+
+def wipe_directory(directory_path, dry_run=False):
+    """Wipes a directory"""
+    try:
+        if dry_run:
+            print "rm -rf %s" % directory_path
+        else:
+            rmtree(directory_path)
+    except OSError as error:
+        if ENOENT == error.errno:
+            pass
+        else:
+            raise
+
+
+def create_directory(directory_path, dry_run=False):
+    """Creates a directory"""
+    try:
+        if dry_run:
+            print "mkdir -p %s" % directory_path
+        else:
+            makedirs(directory_path)
+    except OSError as error:
+        if EEXIST == error.errno:
+            pass
+        else:
+            raise
+
+
+def review_commands(options):
+    """Provides a quick review of everything installed"""
+    commands = [
+        ['which', 'rofi'],
+        ['rofi', '-version']
+    ]
+    if not options.skip_debug:
+        commands.append(['which', "rofi%s" % options.debug_suffix])
+        commands.append(["rofi%s" % options.debug_suffix, '-version'])
+    run_commands(commands, options.dry_run)
+
+
+def prep_build(options):
+    cd(options.source, options.dry_run)
+    wipe_directory(options.build, options.dry_run)
+    create_directory(options.build, options.dry_run)
+
+
+def build(options, is_debuggable=False):
+    """Builds the rofi executable"""
+    prep_build(options)
+    cd(options.build, options.dry_run)
+    commands = []
+    if is_debuggable:
+        commands.append([
+            options.configure,
+            "--prefix='%s'" % (options.install_prefix),
+            '--enable-timings',
+            '--enable-asan',
+            '--enable-gcov',
+            "--program-suffix='%s'" % (options.debug_suffix),
+        ])
+    else:
+        commands.append([
+            options.configure,
+            "--prefix='%s'" % (options.install_prefix),
+        ])
+    commands.append(['make'])
+    if is_debuggable:
+        commands.append(['make', 'CFLAGS=\'-O0 -g3\'', 'clean', 'rofi'])
+    commands.append(['sudo', 'make', 'install'])
+    run_commands(commands, options.dry_run)
+
+
+def build_and_install(options):
+    """Builds and installs rofi (and possibly rofi-debug)"""
+    build(options)
+    if not options.skip_debug:
+        build(options, True)
+
+
+def restore_tooling(options):
+    """Builds missing build files"""
+    commands = [['autoreconf', '-i']]
+    run_commands(commands, options.dry_run)
+
+
+def clone_repo(dry_run=False):
+    """Clones the repo"""
+    commands = [[
+        'git',
+        'clone',
+        'https://github.com/DaveDavenport/rofi',
+        '--recursive',
+        '.'
+    ]]
+    run_commands(commands, dry_run)
+
+
+def update_existing_repo(dry_run=False):
+    """Attempts to update. Falls back to clone if repo DNE"""
+    try:
+        call(['git', 'status'])
+    except CalledProcessError as error:
+        if ERROR_NOT_A_REPO == error.returncode:
+            return clone_repo(dry_run)
+        else:
+            raise
+    commands = [
+        ['git', 'stash'],
+        ['git', 'reset', '--hard'],
+        ['git', 'pull'],
+        ['git', 'submodule', 'init'],
+        ['git', 'submodule', 'update'],
+    ]
+    return run_commands(commands, dry_run)
+
+
+def refresh_source(options):
+    """Refreshes the source code via update or clone"""
+    cd(options.source, options.dry_run)
+    if options.update:
+        update_existing_repo(options.dry_run)
+    else:
+        clone_repo(options.dry_run)
+
+
+def prep_source_directory(options):
+    """Preps the source directory"""
+    if not options.update:
+        wipe_directory(options.source, options.dry_run)
+    create_directory(options.source, options.dry_run)
+
+
+def install_dependencies(options):
+    """Installs necessary system packages"""
+    commands = [
+        ['sudo', 'dnf', 'install', '-y'] + BUILD_DEPENDENCIES,
+        ['sudo', 'dnf', 'install', '-y'] + DEVEL_DEPENDENCIES,
+    ]
+    if not options.skip_debug:
+        commands.append(
+            ['sudo', 'dnf', 'install', '-y'] + DEBUG_DEPENDENCIES
+        )
+    run_commands(commands, options.dry_run)
+
+
+def parse_argv(args=None):
+    """Parses CLI args"""
+    if args is None:
+        args = argv[1:]
+    parser = ArgumentParser(
+        description='Installs rofi from source'
+    )
+    parser.add_argument(
+        '-d', '--source-directory',
+        dest='source',
+        default=DEFAULT_SOURCE_DIRECTORY,
+        help="source directory (default %s)" % DEFAULT_SOURCE_DIRECTORY
+    )
+    parser.add_argument(
+        '-b', '--build-directory',
+        dest='build',
+        default=None,
+        help='build directory (default <source path>/build)'
+    )
+    parser.add_argument(
+        '-p', '--prefix',
+        dest='install_prefix',
+        default=DEFAULT_INSTALL_PREFIX,
+        help="root installation directory (default %s)" % DEFAULT_INSTALL_PREFIX
+    )
+    parser.add_argument(
+        '--dry-run',
+        dest='dry_run',
+        action='store_true',
+        help='dry run'
+    )
+    debug_opts = parser.add_mutually_exclusive_group()
+    debug_opts.add_argument(
+        '--skip-debug',
+        dest='skip_debug',
+        action='store_true',
+        help='skip the debuggable build'
+    )
+    debug_opts.add_argument(
+        '-s', '--debug-suffix',
+        dest='debug_suffix',
+        default=DEFAULT_DEBUG_SUFFIX,
+        help="debug suffix, (default %s, e.g. rofi%s)" % (
+            DEFAULT_DEBUG_SUFFIX,
+            DEFAULT_DEBUG_SUFFIX
+        )
+    )
+    refresh_opts = parser.add_mutually_exclusive_group()
+    refresh_opts.add_argument(
+        '-u', '--update',
+        dest='update',
+        action='store_true',
+        help='update using an existing clone'
+    )
+    refresh_opts.add_argument(
+        '-f', '--force',
+        dest='force',
+        action='store_true',
+        help='wipes the source directory and clones a fresh copy'
+    )
+    options = parser.parse_args(args)
+    if options.build is None:
+        options.build = join(options.source, 'build')
+    return options
+
+
+def cli():
+    """Bootstraps the script"""
+    options = parse_argv()
+    setattr(options, 'configure', join(options.source, 'configure'))
+    install_dependencies(options)
+    prep_source_directory(options)
+    refresh_source(options)
+    restore_tooling(options)
+    build_and_install(options)
+    review_commands(options)
+    sys_exit(0)
+
+if '__main__' == __name__:
+    cli()
