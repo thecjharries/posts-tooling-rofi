@@ -87,7 +87,7 @@ If we're not `grabbing`, there's no reason to process any of the other condition
     )
 }}
 
-Once we are grabbing, we should stop when we hit a line with no fields. The `NF` magic variable counts the number of fields per record. The `exit` command will shoot us either to the `END` of the `awk` script, skipping any remaining records.
+Once we are grabbing, we should stop when we hit a line with no fields. The `NF` magic variable counts the number of fields per record. The `exit` command will shoot us straight to the `END` of the `awk` script, skipping any remaining records.
 
 {{
     highlight_block("""\
