@@ -234,7 +234,7 @@ def parse_argv(args=None):
         choices=['matching', 'sort', 'levenshtein-sort'],
         help='Change only the specified option',
     )
-    config_options = exclusive_options.add_argument_group()
+    config_options = parser.add_argument_group()
     config_options.add_argument(
         '-m', '--matching',
         dest='matching',
