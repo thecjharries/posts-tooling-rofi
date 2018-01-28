@@ -1,0 +1,4 @@
+#!/bin/bash
+
+rm -rf $XDG_USER_CONFIG_DIR/rofi/config*
+rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
