@@ -592,4 +592,11 @@ $ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
         no_header = True
     )
 }}
+
+## Sorting
+
+For the most part, `rofi` sorts via [Levenshstein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). In a nutshell, the Levenshstein distance counts the number of changes necessary to go from one string to another. You can view [`rofi`'s implementation](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/helper.c#L691). It's `utf-8`-aware, which is very nice.
+
+When running `fuzzy` matches, `rofi` can also sort [via FZF](https://github.com/junegunn/fzf). Viewing [its implementation of FZF](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/helper.c#L772) might be useful. I believe it too is `utf-8`-aware.
+
 {% endblock %}
