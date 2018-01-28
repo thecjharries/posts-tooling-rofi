@@ -1,0 +1,304 @@
+#!/usr/bin/env python
+
+# pylint: disable=misplaced-comparison-constant,missing-docstring
+from __future__ import print_function
+
+from os import environ
+from os.path import exists, join
+from re import compile as re_compile, finditer, match, MULTILINE, VERBOSE
+from shutil import copy
+from subprocess import check_output, PIPE, Popen
+from sys import argv, exit as sys_exit
+from tempfile import NamedTemporaryFile
+from types import StringTypes
+
+from argparse import ArgumentParser, SUPPRESS
+
+CONFIG_FILE = join(environ['XDG_USER_CONFIG_DIR'], 'rofi', 'config.rasi')
+
+ACTIVE_CHOICE_IDENTIFIER = " (active)"
+
+MATCHING_METHODS = [
+    'fuzzy',
+    'glob',
+    'normal',
+    'regex',
+]
+
+FLAG_STATES = [
+    'true',
+    'false'
+]
+
+DEFAULTS = {
+    'matching': 'normal',
+    'sort': 'true',
+    'levenshtein-sort': 'false'
+}
+
+MESSAGES = {
+    'matching': 'change matching method',
+    'sort': 'enable sorting',
+    'levenshtein-sort': 'force levenshtein sorting'
+}
+
+CONFIG_OPTIONS_RAW_PATTERN = r"""
+^
+.*?
+\s
+(?P<option>
+    matching
+    |
+    (?:levenshtein-)?sort
+)
+:\s*
+[\"']?
+(?P<value>
+    .*?
+)
+[\"']?;
+.*?
+$
+"""
+
+CONFIG_OPTIONS_PATTERN = re_compile(
+    CONFIG_OPTIONS_RAW_PATTERN,
+    VERBOSE | MULTILINE
+)
+
+
+def review_diff():
+    """Compares the config before and after running"""
+    with NamedTemporaryFile() as suppressed_output:
+        result_pipe = Popen(
+            [
+                'diff',
+                '--color=always',
+                '--unified=0',
+                '-t',
+                '--tabsize=4',
+                "%s.bak" % CONFIG_FILE,
+                CONFIG_FILE
+            ],
+            stdout=suppressed_output,
+        )
+        result_pipe.communicate()
+        suppressed_output.seek(0)
+        result = suppressed_output.read()
+    print(result)
+
+
+def update_config(key, value):
+    """Updates the config file"""
+    if isinstance(value, StringTypes):
+        if not match("true|false", value):
+            value = '"%s"' % value
+    check_output(
+        [
+            'sed',
+            '-i',
+            '-e',
+            r"s/^.*\s%s:.*$/\t%s: %s;/g" % (key, key, value),
+            CONFIG_FILE
+        ],
+    )
+
+
+def validate_item(item_possibilities, defaults_key, desired_value):
+    """
+    Validates the passed-in value. On failure, validates the current default. On
+    failure, returns the first possibility.
+    """
+    if desired_value in item_possibilities:
+        return desired_value
+    desired_value = DEFAULTS[defaults_key]
+    if desired_value in item_possibilities:
+        return desired_value
+    return item_possibilities[0]
+
+
+def pipe_choices_to_rofi(choices, defaults_key):
+    """Throws the choices out via rofi and returns the result"""
+    rofi_pipe = Popen(
+        [
+            'rofi',
+            '-dmenu',
+            '-mesg', "%s" % MESSAGES[defaults_key],
+            '-no-fixed-num-lines',
+            '-width', "%d" % (len(MESSAGES[defaults_key]) + 1),
+            '-hide-scrollbar',
+            '-theme-str',
+            '#inputbar {'
+            ' children: [entry,case-indicator]; '
+            '}',
+            '-theme-str',
+            '#listview {'
+            ' dynamic: true; '
+            '}',
+            '-theme-str',
+            '#mainbox {'
+            ' children: [message,inputbar,listview]; '
+            '}',
+            '-theme-str',
+            '#message {'
+            ' border: 0;'
+            ' background-color: @selected-normal-background;'
+            ' text-color: @selected-normal-foreground; '
+            '}',
+            '-theme-str',
+            '#textbox {'
+            ' text-color: inherit; '
+            '}'
+        ],
+        stdin=PIPE,
+        stdout=PIPE,
+    )
+    choices_pipe = Popen(
+        [
+            'echo',
+            '-e',
+            '\n'.join(choices),
+        ],
+        stdout=rofi_pipe.stdin,
+    )
+    result = rofi_pipe.communicate()[0]
+    choices_pipe.wait()
+    result = result.strip()
+    if not result:
+        result = choices[0]
+    result = result.replace(ACTIVE_CHOICE_IDENTIFIER, "")
+    return result
+
+
+def create_choices(all_choices, current_choice):
+    """Creates a list of choices for dmenu"""
+    choices = ["%s%s" % (current_choice, ACTIVE_CHOICE_IDENTIFIER)]
+    all_choices.sort()
+    for choice in all_choices:
+        if current_choice != choice:
+            choices.append(choice)
+    return choices
+
+
+def find_desired_item(item_possibilities, defaults_key):
+    """Builds the dmenu list, polls the user, and validates the result"""
+    choices = create_choices(item_possibilities, DEFAULTS[defaults_key])
+    value = pipe_choices_to_rofi(choices, defaults_key)
+    return validate_item(item_possibilities, defaults_key, value)
+
+
+def parse_and_update_desired_item(item_possibilities, defaults_key, options):
+    """
+    Attempts to use passed-in values when possible. Otherwise polls the user for
+    each value via dmenu (via rofi)
+    """
+    desired_value = getattr(options, defaults_key, None)
+    if (
+            not desired_value
+            or
+            desired_value != validate_item(
+                item_possibilities,
+                defaults_key,
+                desired_value
+            )
+    ):
+        desired_value = find_desired_item(item_possibilities, defaults_key)
+    update_config(defaults_key, desired_value)
+
+
+def determine_everything(options):
+    """Parses and updates matching, sorting, and Levenshstein sorting options"""
+    parse_and_update_desired_item(MATCHING_METHODS, 'matching', options)
+    parse_and_update_desired_item(FLAG_STATES, 'sort', options)
+    parse_and_update_desired_item(FLAG_STATES, 'levenshtein-sort', options)
+
+
+def parse_argv(args=None):
+    """Parses CLI args"""
+    if args is None:
+        args = argv[1:]
+    parser = ArgumentParser(
+        description='Installs rofi from source'
+    )
+    parser.add_argument(
+        '--skip-diff',
+        dest='skip_diff',
+        action='store_true',
+        help="Don't print the config diff"
+    )
+    exclusive_options = parser.add_mutually_exclusive_group()
+    exclusive_options.add_argument(
+        '-o', '--only',
+        dest='only',
+        default=SUPPRESS,
+        choices=['matching', 'sort', 'levenshtein-sort'],
+        help='Change only the specified option',
+    )
+    config_options = exclusive_options.add_argument_group()
+    config_options.add_argument(
+        '-m', '--matching',
+        dest='matching',
+        nargs='?',
+        const=DEFAULTS['matching'],
+        default=SUPPRESS,
+        choices=MATCHING_METHODS,
+        help='Sets the matching method',
+    )
+    config_options.add_argument(
+        '-s', '--sort',
+        dest='sort',
+        nargs='?',
+        const=DEFAULTS['sort'],
+        default=SUPPRESS,
+        choices=FLAG_STATES,
+        help='Enables sorting',
+    )
+    config_options.add_argument(
+        '-l', '--levenshtein-sort',
+        dest='levenshtein-sort',
+        nargs='?',
+        const=DEFAULTS['levenshtein-sort'],
+        default=SUPPRESS,
+        choices=FLAG_STATES,
+        help='Forces Levenshtein sorting',
+    )
+    return parser.parse_args(args)
+
+
+def create_config_if_dne(raw_config):
+    """Creates a new config file if it doesn't exist"""
+    if not exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'w+') as config_file:
+            config_file.write(raw_config)
+
+
+def load_config():
+    """Loads the active rofi config"""
+    raw_config = check_output(['rofi', '-dump-config'])
+    for config_match in finditer(CONFIG_OPTIONS_PATTERN, raw_config):
+        DEFAULTS[config_match.group('option')] = config_match.group('value')
+    create_config_if_dne(raw_config)
+
+
+def backup_config():
+    """Backs up the current config"""
+    copy(CONFIG_FILE, CONFIG_FILE + '.bak')
+
+
+def cli():
+    """Bootstraps the app"""
+    load_config()
+    backup_config()
+    options = parse_argv()
+    if getattr(options, 'only', None):
+        for key, value in DEFAULTS.iteritems():
+            if key != options.only:
+                setattr(options, key, value)
+    print(options)
+    determine_everything(options)
+    if not options.skip_diff:
+        review_diff()
+    sys_exit(0)
+
+if '__main__' == __name__:
+    cli()
