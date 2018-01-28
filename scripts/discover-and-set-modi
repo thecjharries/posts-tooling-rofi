@@ -49,4 +49,4 @@ awk -i inplace \
     }' \
     "$CONFIG_FILE"
 
-diff -U 0 "$CONFIG_FILE"{.bak,}
+diff --color --unified=0 "$CONFIG_FILE"{.bak,}
