@@ -485,9 +485,62 @@ A simple script like this takes cardinals and ordinals as input and updates the 
     )
 }}
 
+It's very simple to use. Like `rofi`, it defaults to the center position.
 
-With the cardinals defined, we can pull out the ordinals as well.
-
+{{
+    shell_session("""\
+$ scripts/location-changer n
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-/* location: 0;*/
++   location: 2;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+{{
+    shell_session("""\
+$ scripts/location-changer east
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 2;
++   location: 4;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+{{
+    shell_session("""\
+$ scripts/location-changer qqq
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 2;
++   location: 0;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
 
 ## Streamline Usage
 
