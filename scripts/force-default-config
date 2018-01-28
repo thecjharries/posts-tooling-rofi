@@ -13,7 +13,6 @@ function rebuild_theme {
 }
 
 function reconnect_theme {
-    set -x
     sed \
         --in-place='.bak' \
         --regexp-extended \
@@ -21,7 +20,29 @@ function reconnect_theme {
         $ROOT_DIR/config.rasi
 }
 
-case "$1" in
+if [[ -n "$1" ]]; then
+    INPUT="$1"
+else
+    INPUT=$(
+        echo -e "config\ntheme\nall" \
+            | rofi \
+                -dmenu \
+                -mesg 'forcibly rebuild config' \
+                -no-fixed-num-lines \
+                -width 24 \
+                -hide-scrollbar \
+                -theme-str '#inputbar { children: [entry,case-indicator]; }' \
+                -theme-str '#listview { dynamic: true; }' \
+                -theme-str '#mainbox { children: [message,inputbar,listview]; }' \
+                -theme-str '#message { border: 0; background-color: @selected-normal-background; text-color: @selected-normal-foreground; }' \
+                -theme-str '#textbox { text-color: inherit; }'
+    )
+    if [[ -z $INPUT ]]; then
+        exit 0
+    fi
+fi
+
+case "$INPUT" in
     config)
         rebuild_config
         ;;
