@@ -595,8 +595,168 @@ $ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
 
 ## Sorting
 
-For the most part, `rofi` sorts via [Levenshstein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). In a nutshell, the Levenshstein distance counts the number of changes necessary to go from one string to another. You can view [`rofi`'s implementation](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/helper.c#L691). It's `utf-8`-aware, which is very nice.
+For the most part, `rofi` sorts via [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). In a nutshell, the Levenshtein distance counts the number of changes necessary to go from one string to another. You can view [`rofi`'s implementation](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/helper.c#L691). It's `utf-8`-aware, which is very nice.
 
 When running `fuzzy` matches, `rofi` can also sort [via FZF](https://github.com/junegunn/fzf). Viewing [its implementation of FZF](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/helper.c#L772) might be useful. I believe it too is `utf-8`-aware.
+
+### Comparison
+
+I've made a quick chart to (quite briefly) highlight the differences:
+
+![comparison](/content/images/2018/01/comparison.png)
+
+Personally, I find it useful to have things at least minimally sorted as I'm going.
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    -E 's/^.*\\ssort:.*$/\\tsort: true;/g' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -25 +25 @@
+-/* sort: false;*/
++   sort: true;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+However, the `matching` method is very much situational. `normal` should work most of the time. `fuzzy` might be better, but I don't have any metrics so I'm not sure how it affects performance and all that. `glob` is amazing when moving files around, but might not be very useful when attempting to `drun`. You could always run `regex` but then no one else would want to read your scripts and you'd turn to a life of blogging like me.
+
+#### Matching/Sorting Comparison Script
+
+For reference, this is the script I used to build the images contained in the chart in this section.
+
+{{
+    highlight_block(
+        'scripts/generate-matching-and-sorting-comparison',
+        blob_path = 'scripts/generate-matching-and-sorting-comparison',
+        explicit_lexer_name = 'BashLexer',
+        title = 'generate-matching-and-sorting-comparison',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/generate-matching-and-sorting-comparison'
+    )
+}}
+
+### (Yet Another) `rofi` Options Script
+
+I slapped together a quick script to handle matching and sorting.
+
+{{
+    shell_session("""\
+$ scripts/configure-matching-and-sorting
+usage: configure-matching-and-sorting [-h] [--skip-diff]
+                                      [-o {matching,sort,levenshtein-sort}]
+                                      [-m [{fuzzy,glob,normal,regex}]]
+                                      [-s [{true,false}]] [-l [{true,false}]]
+
+Installs rofi from source
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --skip-diff           Don't print the config diff
+  -o {matching,sort,levenshtein-sort}, --only {matching,sort,levenshtein-sort}
+                        Change only the specified option
+
+  -m [{fuzzy,glob,normal,regex}], --matching [{fuzzy,glob,normal,regex}]
+                        Sets the matching method
+  -s [{true,false}], --sort [{true,false}]
+                        Enables sorting
+  -l [{true,false}], --levenshtein-sort [{true,false}]
+                        Forces Levenshtein sorting
+""")
+}}
+
+I tried to make this easy. To use the existing config, just add the pertinent flag.
+
+{{
+    shell_session("""\
+$ scripts/configure-matching-and-sorting -m -s -l
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -25,2 +25,2 @@
+-/*  sort: false;*/
+-/*  levenshtein-sort: false;*/
++    sort: false;
++    levenshtein-sort: false;
+@@ -35 +35 @@
+-/*  matching: \"normal\";*/
++    matching: \"normal\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+While it looks like that did something, it just uncommented the defaults. It didn't actually change anything.
+
+To actually change something, you can either feed it in via the command or leave off the flag and feed it in via the GUI.
+
+{{
+    shell_session("""\
+$ scripts/configure-matching-and-sorting -o matching -m fuzzy
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -35 +35 @@
+-    matching: \"normal\";
++    matching: \"fuzzy\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+{{
+    shell_session("""\
+$ scripts/configure-matching-and-sorting -o matching
+""")
+}}
+
+![configure-matching-and-sorting-gui-matching-glob](/content/images/2018/01/configure-matching-and-sorting-gui-matching-glob.png)
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -35 +35 @@
+-    matching: \"fuzzy\";
++    matching: \"glob\";
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+#### Full Script
+
+{{
+    highlight_block(
+        'scripts/configure-matching-and-sorting',
+        blob_path = 'scripts/configure-matching-and-sorting',
+        explicit_lexer_name = 'PythonLexer',
+        title = 'configure-matching-and-sorting',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/configure-matching-and-sorting'
+    )
+}}
 
 {% endblock %}
