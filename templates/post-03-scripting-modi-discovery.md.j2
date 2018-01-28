@@ -7,7 +7,7 @@ This post looks at automatically updating `modi` lists. It also covers some intr
 {% block content %}
 ## Script `modi` Discovery
 
-If you look at the `man` page or check `rofi`'s help, you'll probably notice that not all the modis are enabled. You can also force the issue by attempting to `-show` a nonexistent modi:
+If you look at the `man` page or check `rofi`'s help, you'll probably notice that not all the modis are enabled. You can also force the issue by attempting to `-show` a nonexistent `modi`:
 
 {{
     shell_session("""\
@@ -35,14 +35,14 @@ $ grep -E '\smodi:' $XDG_USER_CONFIG_DIR/rofi/config.rasi
 """)
 }}
 
-The definition is pretty simple. It's just a comma-separated list of `modi` inside a string. Since `rofi` gives provides a convenient list of accessible modi, we have two choices:
+The definition is pretty simple. It's just a comma-separated list of `modi` inside a string. Since `rofi` gives provides a convenient list of accessible `modi`, we have two choices:
 
 1. manually pick desired `modi` and manually update the config like a peasant, or
 2. stream the whole thing directly from the help into the config.
 
 Of course, you could probably finish #1 before you get done reading the following code breakdown, but where's the fun in that?
 
-The first thing we have to do is parse the list of available modi. At the moment, it looks like help [leads the list with `Detected modi`](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L287), prints [modi name and active state](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L248), and finishes [with an empty line](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L289). The rest of the help file isn't useful here. We're going to have to parse essentially the entire thing, since the pertinent help appears at the bottom. `sed` would be an okay solution, printing only the lines we're interested in and manipulating them. However, we'd have to pipe those results into something else to clean them up for use as a single-line string. `awk`, on the other hand, will let us parse the file and manipulate the return as needed.
+The first thing we have to do is parse the list of available `modi`. At the moment, it looks like help [leads the list with `Detected modi`](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L287), prints [`modi` name and active state](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L248), and finishes [with an empty line](https://github.com/DaveDavenport/rofi/blob/1.4.2/source/rofi.c#L289). The rest of the help file isn't useful here. We're going to have to parse essentially the entire thing, since the pertinent help appears at the bottom. `sed` would be an okay solution, printing only the lines we're interested in and manipulating them. However, we'd have to pipe those results into something else to clean them up for use as a single-line string. `awk`, on the other hand, will let us parse the file and manipulate the return as needed.
 
 ## Available `modi`
 
