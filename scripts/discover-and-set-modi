@@ -49,4 +49,4 @@ awk -i inplace \
     }' \
     "$CONFIG_FILE"
 
-diff "$CONFIG_FILE"{.bak,}
+diff -U 0 "$CONFIG_FILE"{.bak,}
