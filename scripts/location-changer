@@ -38,7 +38,7 @@ done
 
 if [[ -n "$1" ]]; then
     INPUT="$1"
-    DESIRED_LOCATION_INDEX=$(
+    DESIRED_LOCATION_KEY=$(
         echo $INPUT \
             | awk ' \
                 { \
@@ -63,7 +63,7 @@ if [[ -n "$1" ]]; then
                     print result; \
                 }'
     )
-    DESIRED_LOCATION="${DIRECTION_INDICES[$DESIRED_LOCATION_INDEX]}"
+    DESIRED_LOCATION="${DIRECTION_INDICES[$DESIRED_LOCATION_KEY]}"
 else
     INPUT=$(
         printf '%s\n' "${FULL_DIRECTIONS[@]}" \
