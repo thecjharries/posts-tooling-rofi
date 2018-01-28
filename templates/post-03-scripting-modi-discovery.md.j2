@@ -219,6 +219,13 @@ keys,combi,drun,ssh,run,windowcd,window
 """)
 }}
 
+## Updating the Config File
+
+To edit the config, we'll have to parse the existing config line-by-line and update the desired values. `sed` is the go-to, but, once again, `awk` offers a couple of features that are useful here:
+
+1. `bash` variable expansion is much easier (i.e. less messy) with `awk`, and
+2. manipulating multiple things at the same time is a bit easier.
+
 We'll need to figure out which config option we want to modify:
 
 {{
@@ -229,13 +236,7 @@ $ cat $XDG_CONFIG_HOME/rofi/config.rasi | grep modi
 """)
 }}
 
-
-## `-show`-able `modi`
-
-To edit the config, we'll have to parse the existing config line-by-line and update the desired values. `sed` is the go-to, but, once again, `awk` offers a couple of features that are useful here:
-
-1. `bash` variable expansion is much easier (i.e. less messy) with `awk`, and
-2. manipulating multiple things at the same time is a bit easier.
+### `-show`-able `modi`
 
 The first thing we want to do is limit ourselves to the `-show`-able `modi` config:
 
@@ -284,7 +285,7 @@ $ diff $XDG_USER_CONFIG_DIR/rofi/config.rasi{.bak,}
     )
 }}
 
-## `combi` `modi`
+### `combi` `modi`
 
 This process is almost identical to [`-show`-able `modi`](#showablemodi), so I'll skip the `awk` breakdown. The `combi` `modi` combines multiple `modi` into a single instance. This allows us to group multiple modes together by default.
 
