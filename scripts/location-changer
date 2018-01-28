@@ -1,0 +1,38 @@
+#!/bin/bash
+
+DIRECTIONS=(c n{w,,e} e s{e,,w} w)
+declare -A DIRECTION_INDICES
+
+for index in "${!DIRECTIONS[@]}"; do
+    key="${DIRECTIONS[$index]}"
+    DIRECTION_INDICES[$key]=$index
+done
+
+INPUT=$1
+DESIRED_LOCATION=$(
+    echo $INPUT \
+        | awk '
+            {
+                input = tolower($1);
+                input = gensub(/[^a-z]/, "", "g", input);
+                where = match(input, /^([ns])(o[ru]th)?/, cardinal);
+                if (where != 0) {
+                    result = cardinal[1];
+                    input = gensub(/^([ns])(o[ru]th)?/, "", "g", input);
+                } else {
+                    result = "";
+                }
+                where = match(input, /^([ew])([ae]st)?/, cardinal);
+                if (where != 0) {
+                    result = result""cardinal[1];
+                }
+                if ("" == result) {
+                    result = "c";
+                }
+            }
+            END {
+                print result;
+            }'
+)
+
+sed --in-place='.bak' -E "s/^.*\slocation:.*$/\tlocation: ${DIRECTION_INDICES[$DESIRED_LOCATION]};/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
