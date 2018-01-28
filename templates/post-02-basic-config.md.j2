@@ -38,4 +38,53 @@ $ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
 
 We've now got a super basic config file that contains every possible option (I think) commented out.
 
+## Theme File
+
+While we're at it, we might as well dump the theme too.
+
+{{
+    shell_session("""\
+$ rofi -dump-theme > $XDG_USER_CONFIG_DIR/rofi/theme.rasi
+""")
+}}
+
+To ensure the theme is actually consumed, we'll need to update the config.
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    --regexp-extended \\
+    -e \"s~^.*\\stheme:.*$~\\ttheme: \\\"$XDG_USER_CONFIG_DIR/rofi/theme.rasi\\\";~g\" \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+## Scripted
+
+If you're like me, you're going to mess up the config on a fairly regular basis. Same goes if you're actively developing with `rofi`. It's useful to have a quick method to rebuild defaults.
+
+{{
+    highlight_block(
+        'scripts/force-default-config',
+        blob_path = 'scripts/force-default-config',
+        explicit_lexer_name = 'BashLexer',
+        title = 'force-default-config',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/force-default-config'
+    )
+}}
+
+This script works both via the CLI and via the GUI, thanks to `rofi`.
+
+{{
+    shell_session("""\
+$ scripts/force-default-config all
+(rebuilds everything)
+$ scripts/force-default-config
+""")
+}}
+
+![basic-config-scripted-gui](/content/images/2018/01/basic-config-scripted-gui.png)
+
+
 {% endblock %}
