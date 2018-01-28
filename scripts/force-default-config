@@ -1,4 +1,40 @@
 #!/bin/bash
 
-rm -rf $XDG_USER_CONFIG_DIR/rofi/config*
-rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
+ROOT_DIR="$XDG_USER_CONFIG_DIR/rofi"
+
+function rebuild_config {
+    rm -rf $ROOT_DIR/config*
+    rofi -dump-config > $ROOT_DIR/config.rasi
+}
+
+function rebuild_theme {
+    rm -rf $ROOT_DIR/theme*
+    rofi -dump-theme > $ROOT_DIR/theme.rasi
+}
+
+function reconnect_theme {
+    set -x
+    sed \
+        --in-place='.bak' \
+        --regexp-extended \
+        -e "s~^.*\stheme:.*$~\ttheme: \"$ROOT_DIR/theme.rasi\";~g" \
+        $ROOT_DIR/config.rasi
+}
+
+case "$1" in
+    config)
+        rebuild_config
+        ;;
+    theme)
+        rebuild_theme
+        ;;
+    all)
+        rebuild_config
+        rebuild_theme
+        ;;
+    *)
+        echo "usage: $0 {config,theme,all}"
+        exit 1
+        ;;
+esac
+reconnect_theme
