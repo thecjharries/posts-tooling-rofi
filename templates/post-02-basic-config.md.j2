@@ -15,7 +15,7 @@ $ rofi --help \\
     | awk -F':' '/Configuration/{ print \"cat \"$2 }' \\
     | . /dev/stdin
 
-cat: /home/cjharries/.config/rofi/config: No such file or directory
+cat: $XDG_USER_CONFIG_DIR/rofi/config: No such file or directory
 """)
 }}
 
