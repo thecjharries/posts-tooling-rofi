@@ -532,12 +532,10 @@ eval $(
 Why exactly do we need the `pid`? It's so we can duplicate the currently running script with all its arguments.
 
 {{
-    highlight_block("""\
-ROFI_COMMAND=$(ps --no-headers -o command -p $(cat \"$ROFI_PID\"))
-""",
-        explicit_lexer_name = 'BashLexer',
-        title = 'location-changer-respawning-modi'
-    )
+    shell_session("""\
+$ ps --no-headers -o command -p $(cat \"$ROFI_PID\")
+rofi -show drun
+""")
 }}
 
 The command by itself isn't going to do us very much good. Attempting to run `rofi` from inside a `script` `modi` hits the process lock. (I supposed we could unlock it, but that's a whole new can of bugs to crush.) Happily enough, we can dump the command out to another script and execute in the background to refresh `rofi`.
