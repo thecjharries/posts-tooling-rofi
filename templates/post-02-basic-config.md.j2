@@ -1,0 +1,90 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post looks at basic `rofi` configuration.
+
+{% endblock %}
+{% block content %}
+## Config File
+
+At the momemnt, `rofi` is using default values and (probably) refers to a config file that doesn't exist.
+
+{{
+    shell_session("""\
+$ rofi --help \\
+    | awk -F':' '/Configuration/{ print \"cat \"$2 }' \\
+    | . /dev/stdin
+
+cat: $XDG_USER_CONFIG_DIR/rofi/config: No such file or directory
+""")
+}}
+
+`rofi` provides a couple of ways [to load config](https://github.com/DaveDavenport/rofi/blob/1.4.2/doc/rofi.1.markdown#configuration) (plus templating it for new users). We'll need to create the user directory via `$XDG_USER_CONFIG_DIR` first:
+
+{{
+    shell_session("""\
+$ echo $XDG_USER_CONFIG_DIR || echo \"export XDG_USER_CONFIG_DIR=/path/to/desired/.config\" >> ~/.whateverrc && source ~/.whateverrc
+$ mkdir -p $XDG_USER_CONFIG_DIR/rofi
+""")
+}}
+
+Since we're running `>=1.4`, we can use [the new config format](https://github.com/DaveDavenport/rofi/blob/1.4.2/doc/rofi-theme.5.markdown).
+
+{{
+    shell_session("""\
+$ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+We've now got a super basic config file that contains every possible option (I think) commented out.
+
+## Theme File
+
+While we're at it, we might as well dump the theme too.
+
+{{
+    shell_session("""\
+$ rofi -dump-theme > $XDG_USER_CONFIG_DIR/rofi/theme.rasi
+""")
+}}
+
+To ensure the theme is actually consumed, we'll need to update the config.
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    --regexp-extended \\
+    -e \"s~^.*\\stheme:.*$~\\ttheme: \\\"$XDG_USER_CONFIG_DIR/rofi/theme.rasi\\\";~g\" \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+## Scripted
+
+If you're like me, you're going to mess up the config on a fairly regular basis. Same goes if you're actively developing with `rofi`. It's useful to have a quick method to rebuild defaults.
+
+{{
+    highlight_block(
+        'scripts/force-default-config',
+        blob_path = 'scripts/force-default-config',
+        explicit_lexer_name = 'BashLexer',
+        title = 'force-default-config',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/force-default-config'
+    )
+}}
+
+This script works both via the CLI and via the GUI, thanks to `rofi`.
+
+{{
+    shell_session("""\
+$ scripts/force-default-config all
+(rebuilds everything)
+$ scripts/force-default-config
+""")
+}}
+
+![basic-config-scripted-gui](/content/images/2018/01/basic-config-scripted-gui.png)
+
+
+{% endblock %}
