@@ -1,0 +1,628 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post looks at changing `rofi`'s window location. It also introduces some `rofi` `dmenu` usage to handle input and ends with a introduction to `script` `modi`.
+
+{% endblock %}
+{% block content %}
+## Window Location
+
+By default, `rofi` launches dead-center of the owning screen.
+
+{{
+    shell_session("""\
+$ rofi -show run
+should be in the center
+""")
+}}
+
+There's a config option, `location`, that allows us to change that position. We can instead place the launcher on any of the cardinals, any of the ordinals, or dead center. The locations follow a pattern like this:
+
+{{
+    highlight_block("""\
+1 2 3
+8 0 4
+7 6 5
+""",
+        explicit_lexer_name = 'TextLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+Manipulating the location doesn't require much effort.
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    -E 's/^.*\\slocation:.*$/\\tlocation: 5;/g' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-/* location: 0;*/
++   location: 5;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+## Scripted
+
+However, manually running `sed` every time isn't that fun. We should write something.
+
+### Basic CLI Location Changer
+
+The first thing we'll need to do is detect the current location for comparison. Once again, `awk` is very useful. We'll need to remove comment characters, if the option isn't set yet, and we'll want to strip semicolons to make grabbing easier.
+
+{{
+    highlight_block("""\
+/\slocation:/ {
+    gsub(/\/?\*\/?|;/, \"\");
+    print $2;
+    exit;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'current-location'
+    )
+}}
+
+{{
+    shell_session("""\
+$ rofi -dump-config \\
+    | awk '\\
+        /\slocation:/ { \\
+            gsub(/\/?\*\/?|;/, \"\"); \\
+            print $2; \\
+            exit; \\
+        }'
+0
+""")
+}}
+
+Next we'll need to enumerate the directions. I spent a massive amount of time thinking about this last night, and I haven't been able to come up with anything more clever than some half-hearted expansion and associative arrays. It's a very interesting problem, and I'll probably come back to it.
+
+{{
+    highlight_block("""\
+DIRECTIONS=(c n{w,,e} e s{e,,w} w)
+declare -A DIRECTION_INDICES
+
+for index in \"${!DIRECTIONS[@]}\"; do
+    key=\"${DIRECTIONS[$index]}\"
+    DIRECTION_INDICES[$key]=$index
+done
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions'
+    )
+}}
+
+This will allow us to find the direction with an index via `DIRECTIONS` or the index with a direction via `DIRECTION_INDICES`.
+
+Somehow we've got to pass a location to the script. `argv` never hurt anyone, so we'll go that route. However, if there's one thing you should never do, it's trust your users. We'll need to sanitize and munge the input. Once again, `awk` is a great tool.
+
+{{
+    highlight_block("""\
+DESIRED_LOCATION_KEY=$(
+    echo \"$1\" \\
+        | awk '...'
+)
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions'
+    )
+}}
+
+The first thing we should do is ensure the string contains only the things we're interested in.
+
+{{
+    highlight_block("""\
+{
+    input = tolower($1);
+    input = gensub(/[^a-z]/, \"\", \"g\", input);
+    ...
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'parse-location-input'
+    )
+}}
+
+With a clean input, we should look for easy strings. `[ns]o[ru]th` leads six of the compass points, so stripping those is a good idea. `awk`'s regex is fairly limited, but we can run basic capture groups via `match`. If `input` begins with `[ns]`, we'll snag it and clean `input` before moving on. If it doesn't, we'll set `result` to the empty string to make combos easier.
+
+{{
+    highlight_block("""\
+    ...
+    where = match(input, /^([ns])(o[ru]th)?/, cardinal);
+    if (where != 0) {
+        result = cardinal[1];
+        input = gensub(/^([ns])(o[ru]th)?/, \"\", \"g\", input);
+    } else {
+        result = \"\";
+    }
+    ...
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'parse-location-input'
+    )
+}}
+
+The capture group logic is the same for the remaining cardinals. However, we've got to glue things together now, as the ordinals look like `[ns][ew]`. That's why we dropped a blank `result` above.
+
+{{
+    highlight_block("""\
+    ...
+    where = match(input, /^([ew])([ae]st)?/, cardinal);
+    if (where != 0) {
+        result = result\"\"cardinal[1];
+    }
+    ...
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'parse-location-input'
+    )
+}}
+
+After attempting to capture the directions, `result` will only be empty if
+
+1. `center` was passed, or
+2. we couldn't process and sanitize the input.
+
+We can kill two birds with one stone by providing a default `c` result.
+
+{{
+    highlight_block("""\
+    ...
+    if (\"\" == result) {
+        result = \"c\";
+    }
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'parse-location-input'
+    )
+}}
+
+Finally, we need to send off `result`.
+
+{{
+    highlight_block("""\
+END {
+    print result;
+}
+""",
+        explicit_lexer_name = 'AwkLexer',
+        title = 'parse-location-input'
+    )
+}}
+
+We can easily convert text directions to the proper index via the arrays we built above.
+
+{{
+    highlight_block("""\
+DESIRED_LOCATION=\"${DIRECTION_INDICES[$DESIRED_LOCATION_KEY]}\"
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions'
+    )
+}}
+
+With the new location, we can finally update the config.
+
+{{
+    highlight_block("""\
+sed \\
+    --in-place='.bak' \\
+    --regexp-extended \\
+    -e \"s/^.*\\slocation:.*$/\\tlocation: $DESIRED_LOCATION;/g\" \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+diff \\
+    --color=always \\
+    --unified=0 \\
+    \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions'
+    )
+}}
+
+### CLI Location Changer with GUI
+
+While this will run beautifully, we've completely ignored a very useful tool. `rofi` can, with minimal config, build very simple menus to make interaction easier.
+
+The first thing we'll need to do is build a human-readable list of options.
+
+{{
+    highlight_block("""\
+FULL_DIRECTIONS=(
+    '0 Center'
+    '1 Northwest'
+    '2 North'
+    '3 Northeast'
+    '4 East'
+    '5 Southeast'
+    '6 South'
+    '7 Southwest'
+    '8 West'
+)
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions-gui'
+    )
+}}
+
+It would also be useful if the user knew which `location` was currently active. We can modify the `DIRECTION_INDICES` `for` loop to do just that. On a related note, it would also be much nicer for the active option to be the first in the list in case the user changes their mind quickly. We can accomplish that with a simple swap.
+
+{{
+    highlight_block("""\
+for index in \"${!DIRECTIONS[@]}\"; do
+    key=\"${DIRECTIONS[$index]}\"
+    DIRECTION_INDICES[$key]=$index
+    full_string=\"${FULL_DIRECTIONS[$index]}\"
+    if [[ $CURRENT_LOCATION -eq \"${full_string//[^0-9]/}\" ]]; then
+        first_direction=\"${FULL_DIRECTIONS[0]}\"
+        FULL_DIRECTIONS[$index]=\"$first_direction\"
+        FULL_DIRECTIONS[0]=\"${FULL_DIRECTIONS[$index]} (active)\"
+    fi
+done
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions-gui'
+    )
+}}
+
+While we're building a GUI (sorta), we don't want to remove the CLI. The goal is to build something that works together in tandem. If the script is called with an argument, we'll try to parse it. Otherwise, we'll launch `rofi`.
+
+{{
+    highlight_block("""\
+if [[ -n \"$1\" ]]; then
+    # same logic from above
+else
+    # new rofi logic
+fi
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions-gui'
+    )
+}}
+
+The first thing we have to do is print the array (I use `printf`; I can never get `echo` to do what I want). `rofi` will then consume that (via `/dev/stdout`) to construct its GUI list. I've added a few style things that you can ignore. You really only need to pipe something into `rofi -dmenu`; everything else is just window-dressing.
+
+{{
+    highlight_block("""\
+    INPUT=$(
+        printf '%s\\n' \"${FULL_DIRECTIONS[@]}\" \\
+            | rofi \\
+                -dmenu \\
+                -mesg 'choose location' \\
+                -no-fixed-num-lines \\
+                -width 20 \\
+                -hide-scrollbar \\
+                -theme-str '#inputbar { children: [entry,case-indicator]; }' \\
+                -theme-str '#listview { dynamic: true; }' \\
+                -theme-str '#mainbox { children: [message,inputbar,listview]; }' \\
+                -theme-str '#message { border: 0; background-color: @selected-normal-background; text-color: @selected-normal-foreground; }' \\
+                -theme-str '#textbox { text-color: inherit; }'
+    )
+    if [[ -z \"$INPUT\" ]]; then
+        exit 0
+    fi
+    DESIRED_LOCATION=\"${INPUT//[^0-9]/}\"
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'directions-gui'
+    )
+}}
+
+### Full Location Changer
+
+{{
+    highlight_block(
+        'scripts/location-changer',
+        blob_path = 'scripts/location-changer',
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/location-changer'
+    )
+}}
+
+It's very simple to use. Like `rofi`, it defaults to the center position.
+
+{{
+    shell_session("""\
+$ scripts/location-changer n
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-/* location: 0;*/
++   location: 2;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+{{
+    shell_session("""\
+$ scripts/location-changer qqq
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 2;
++   location: 0;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+The GUI provides an alternate way to get at things.
+
+{{
+    shell_session("""\
+$ scripts/location-changer
+...
+""")
+}}
+
+![location-changer-gui-south](/content/images/2018/01/location-changer-gui-south.png)
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 0;
++   location: 5;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+## Location Changer `modi`
+
+Taking what we've learned, we should be able to build a `script` `modi` capable of updating the window location. Essentially, a `script` `modi` is a never-ending pipe. `rofi` launches the script, the user interacts, and the script finishes. Its output is then piped back into the original script to run again. It will run until an external close action (e.g. `Esc`) is fired or the script sends nothing out on `/dev/stdout`.
+
+### Create a `script` `modi`
+
+Like before, we'll want to start with a list of options. I wanted to include an exit option this time around. We'll also need to parse the current `location` for comparison.
+
+{{
+    highlight_block("""\
+FULL_DIRECTIONS=(
+    '0 Center'
+    '1 Northwest'
+    '2 North'
+    '3 Northeast'
+    '4 East'
+    '5 Southeast'
+    '6 South'
+    '7 Southwest'
+    '8 West'
+    '9 Exit'
+)
+
+CURRENT_LOCATION=$(
+    rofi -dump-config \\
+        | awk '\\
+            /\slocation:/ { \\
+                gsub(/\/?\*\/?|;/, \"\"); \\
+                print $2; \\
+                exit; \\
+            }'
+)
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-modi'
+    )
+}}
+
+I was a bit tidier this time around, and threw the setup into a function. We'll update the option list and print the options, just like before.
+
+{{
+    highlight_block("""\
+function rebuild_directions {
+    FULL_DIRECTIONS[$CURRENT_LOCATION]=\"${FULL_DIRECTIONS[$CURRENT_LOCATION]} (active)\"
+    printf '%s\\n' \"${FULL_DIRECTIONS[@]}\"
+}
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-modi'
+    )
+}}
+
+We'll want to run that no matter what to keep things fresh. However, we won't want to update the config unless the location changes.
+
+{{
+    highlight_block("""\
+if [[ ! -z \"$@\" ]]; then
+    DESIRED_LOCATION=\"${1//[^0-9]/}\"
+    if [[ \"$CURRENT_LOCATION\" -ne \"$DESIRED_LOCATION\" ]]; then
+        if [[ 0 -le \"$DESIRED_LOCATION\" ]] && [[ 8 -ge \"$DESIRED_LOCATION\" ]]; then
+            sed --in-place='.bak' -e \"s/^.*\\slocation:.*$/\\tlocation: $DESIRED_LOCATION;/g\" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+        elif [[ 9 -eq \"$DESIRED_LOCATION\" ]]; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+fi
+rebuild_directions
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-modi'
+    )
+}}
+
+This works quite well. As the user interacts, the config gets updated. It does what it says on the tin. Like this:
+
+![rofi-location-changer-frozen](/content/images/2018/01/rofi-location-changer-frozen.png)
+
+On the surface, that looks awesome. However, if you look closely, the `location` is dead center but `rofi` is reporting `East` is active. This presents a very interesting problem with `script` `modi`. Because they're pipes, `rofi` isn't reloading each time. The `modi` can't call `rofi` again, because it's already running. More importantly, even if it could, it's going to lose the original command, which could contain extra configuration.
+
+### Process-Spawning `modi`
+
+I spent a decent chunk of time beating my head against this, and then I realized that `rofi` stores its `pid`. We can access the `pid` file via the config, which in turn gives us access to all the information we need. Before I get to the exciting stuff, though, it's important to mention safety. It's a really good idea to limit your process count (somehow) in case you create a runaway script. Speaking from experience, it could be half an hour before you can free up enough memory to switch to another `tty` and kill everything.
+
+{{
+    highlight_block("""\
+if [[ 10 -lt $(pgrep -c -f \"$0\") ]]; then
+    pkill -f rofi
+    pkill -f \"$0\"
+    exit 1
+fi
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-respawning-modi'
+    )
+}}
+
+Using `awk`, we can set up variables that are immediately consumed by `eval`.
+
+{{
+    highlight_block("""\
+eval $(
+    rofi -dump-config \
+        | awk '
+            /\slocation:/ {
+                gsub(/\/?\*\/?|;/, \"\");
+                print \"CURRENT_LOCATION=\"$2;
+                location = 1;
+                next;
+            }
+            /\spid:/ {
+                gsub(/\/?\*\/?|;|\"/, \"\");
+                print \"ROFI_PID=\"$2;
+                pid = 1;
+                next;
+            }
+            location && pid {
+                exit;
+            }'
+)
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-respawning-modi'
+    )
+}}
+
+Why exactly do we need the `pid`? It's so we can duplicate the currently running script with all its arguments.
+
+{{
+    shell_session("""\
+$ ps --no-headers -o command -p $(cat \"$ROFI_PID\")
+rofi -show drun
+""")
+}}
+
+The command by itself isn't going to do us very much good. Attempting to run `rofi` from inside a `script` `modi` hits the process lock. (I supposed we could unlock it, but that's a whole new can of bugs to crush.) Happily enough, we can dump the command out to another script and execute in the background to refresh `rofi`.
+
+{{
+    highlight_block("""\
+function create_and_spawn_runner {
+    ROFI_COMMAND=$(ps --no-headers -o command -p $(cat \"$ROFI_PID\"))
+    new_source=$(mktemp -p $TMPDIR rofi-location-XXXX)
+    chmod +x \"$new_source\"
+    cat <<EOF >$new_source
+#!/bin/bash
+
+$ROFI_COMMAND
+rm -rf \"$new_source\"
+EOF
+    coproc \"$new_source\" >/dev/null
+}
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-respawning-modi'
+    )
+}}
+
+Finally, we need to update some of the parsing logic. If the `location` changes, we'll need to spawn a new process and exit instead of continuing along.
+
+{{
+    highlight_block("""\
+if [[ ! -z \"$@\" ]]; then
+    DESIRED_LOCATION=\"${1//[^0-9]/}\"
+    if [[ \"$CURRENT_LOCATION\" -ne \"$DESIRED_LOCATION\" ]]; then
+        if [[ 0 -le \"$DESIRED_LOCATION\" ]] && [[ 8 -ge \"$DESIRED_LOCATION\" ]]; then
+            sed --in-place='.bak' -e \"s/^.*\\slocation:.*$/\\tlocation: $DESIRED_LOCATION;/g\" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+            create_and_spawn_runner
+            exit 0
+        elif [[ 9 -eq \"$DESIRED_LOCATION\" ]]; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+fi
+rebuild_directions
+""",
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer-respawning-modi'
+    )
+}}
+
+### Consuming `script` `modi`
+
+`script` `modi` are listed in config options as `<prompt>:<path>`. You can add them to the `modi` or `combi-modi` lists. I'd recommend creating a directory for `script`s to keep things organized. I did this:
+
+{{
+    shell_session("""\
+$ mkdir -p $XDG_USER_CONFIG_DIR/rofi/scripts
+$ cp scripts/rofi-location-changer $XDG_USER_CONFIG_DIR/rofi/scripts/window-location
+$ awk \\
+    -i inplace \\
+    -v INPLACE_SUFFIX='.bak' \\
+    -v MODI=\"window-location:$XDG_USER_CONFIG_DIR/rofi/scripts/window-location\" \\
+    ' \\
+    match($0, /\s(combi-)?modi:[^\"]*\"([^\"]*)\"/, option) { \\
+        current_modi = gensub(/window-location:[^,]*/, \"\", \"g\", option[2]); \\
+        final_modi = MODI\",\"current_modi; \\
+        printf \"\\t%smodi: \\\"%s\\\";\\n\", option[1], gensub(/,+/, \",\", \"g\", final_modi); \\
+        next; \\
+    } \\
+    { \\
+        print; \\
+    }' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
+}}
+
+If you don't want it in the `combi`, strip that logic.
+
+### Full `window-location` `modi`
+
+{{
+    highlight_block(
+        'scripts/rofi-location-changer',
+        blob_path = 'scripts/rofi-location-changer',
+        explicit_lexer_name = 'BashLexer',
+        title = 'rofi-location-changer',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/rofi-location-changer'
+    )
+}}
+
+{% endblock %}

@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Ensure the process count isn't running out of control
+if [[ 10 -lt $(pgrep -c -f "$0") ]]; then
+    pkill -f rofi
+    pkill -f "$0"
+    exit 1
+fi
+
+# Array of options
+FULL_DIRECTIONS=(
+    '0 Center'
+    '1 Northwest'
+    '2 North'
+    '3 Northeast'
+    '4 East'
+    '5 Southeast'
+    '6 South'
+    '7 Southwest'
+    '8 West'
+    '9 Exit'
+)
+
+# Parse the current config for location and pid
+eval $(
+    rofi -dump-config \
+        | awk '
+            /\slocation:/ {
+                gsub(/\/?\*\/?|;/, "");
+                print "CURRENT_LOCATION="$2;
+                location = 1;
+                next;
+            }
+            /\spid:/ {
+                gsub(/\/?\*\/?|;|"/, "");
+                print "ROFI_PID="$2;
+                pid = 1;
+                next;
+            }
+            location && pid {
+                exit;
+            }'
+)
+
+function rebuild_directions {
+    # Mark it in the options
+    FULL_DIRECTIONS[$CURRENT_LOCATION]="${FULL_DIRECTIONS[$CURRENT_LOCATION]} (active)"
+    # Print the options
+    printf '%s\n' "${FULL_DIRECTIONS[@]}"
+}
+
+function create_and_spawn_runner {
+    # Snag the current command
+    ROFI_COMMAND=$(ps --no-headers -o command -p $(cat "$ROFI_PID"))
+    # Create a temp file
+    new_source=$(mktemp -p $TMPDIR rofi-location-XXXX)
+    # Ensure it's executable
+    chmod +x "$new_source"
+    # Create the runner
+    cat <<EOF >$new_source
+#!/bin/bash
+
+$ROFI_COMMAND
+rm -rf "$new_source"
+EOF
+    # Spawn it in the background
+    coproc "$new_source" >/dev/null
+}
+
+# Something was passed
+if [[ ! -z $@ ]]; then
+    # Parse the new location
+    DESIRED_LOCATION="${1//[^0-9]/}"
+    if [[ "$CURRENT_LOCATION" -ne "$DESIRED_LOCATION" ]]; then
+        # Check to see if location is in the proper range
+        if [[ 0 -le "$DESIRED_LOCATION" ]] && [[ 8 -ge "$DESIRED_LOCATION" ]]; then
+            # It is; update the config
+            sed --in-place='.bak' -e "s/^.*\slocation:.*$/\tlocation: $DESIRED_LOCATION;/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+            # Create next instance
+            create_and_spawn_runner
+            exit 0
+        elif [[ 9 -eq "$DESIRED_LOCATION" ]]; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+fi
+rebuild_directions
