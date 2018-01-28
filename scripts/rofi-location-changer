@@ -1,0 +1,76 @@
+#!/bin/bash
+
+MODI_NAME="window-location"
+
+# Ensure the process count isn't running out of control
+if [[ 10 -lt $(pgrep -c -f "$0") ]]; then
+    pkill -f "$0"
+    exit 1
+fi
+
+# Remove any existing temp files
+rm -rf "$TMPDIR"/rofi-location-*
+
+# Array of options
+FULL_DIRECTIONS=(
+    '0 Center'
+    '1 Northwest'
+    '2 North'
+    '3 Northeast'
+    '4 East'
+    '5 Southeast'
+    '6 South'
+    '7 Southwest'
+    '8 West'
+    '9 Exit'
+)
+
+function rebuild_directions {
+    # Get the current window location
+    CURRENT_LOCATION=$(
+        rofi -dump-config \
+            | awk '\
+                /\slocation:/ { \
+                    gsub(/\/?\*\/?|;/, ""); \
+                    print $2; \
+                    exit; \
+                }'
+    )
+    # Mark it in the options
+    FULL_DIRECTIONS[$CURRENT_LOCATION]="${FULL_DIRECTIONS[$CURRENT_LOCATION]} (active)"
+    # Print the options
+    printf '%s\n' "${FULL_DIRECTIONS[@]}"
+}
+
+function create_and_spawn_runner {
+    # Create a temp file
+    new_source=$(mktemp -p $TMPDIR rofi-location-XXXX)
+    # Ensure it's executable
+    chmod +x "$new_source"
+    # Create the runner
+    cat <<EOF >$new_source
+#!/bin/bash
+
+rofi -show "$MODI_NAME"
+EOF
+    # Spawn it in the background
+    coproc "$new_source" >/dev/null
+}
+
+# No args were passed
+if [[ -z $@ ]]; then
+    rebuild_directions
+# Something was passed
+else
+    # Parse the new location
+    DESIRED_LOCATION="${1//[^0-9]/}"
+    # Check to see if location is in the proper range
+    if [[ 0 -le "$DESIRED_LOCATION" ]] && [[ 8 -ge "$DESIRED_LOCATION" ]]; then
+        # It is; update the config
+        sed --in-place='.bak' -e "s/^.*\slocation:.*$/\tlocation: $DESIRED_LOCATION;/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+        # Create next instance
+        create_and_spawn_runner
+    fi
+    # Exit
+    exit 0
+fi
