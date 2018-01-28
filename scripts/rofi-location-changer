@@ -1,15 +1,11 @@
 #!/bin/bash
 
-MODI_NAME="window-location"
-
 # Ensure the process count isn't running out of control
 if [[ 10 -lt $(pgrep -c -f "$0") ]]; then
+    pkill -f rofi
     pkill -f "$0"
     exit 1
 fi
-
-# Remove any existing temp files
-rm -rf "$TMPDIR"/rofi-location-*
 
 # Array of options
 FULL_DIRECTIONS=(
@@ -25,17 +21,28 @@ FULL_DIRECTIONS=(
     '9 Exit'
 )
 
+# Parse the current config for location and pid
+eval $(
+    rofi -dump-config \
+        | awk '
+            /\slocation:/ {
+                gsub(/\/?\*\/?|;/, "");
+                print "CURRENT_LOCATION="$2;
+                location = 1;
+                next;
+            }
+            /\spid:/ {
+                gsub(/\/?\*\/?|;|"/, "");
+                print "ROFI_PID="$2;
+                pid = 1;
+                next;
+            }
+            location && pid {
+                exit;
+            }'
+)
+
 function rebuild_directions {
-    # Get the current window location
-    CURRENT_LOCATION=$(
-        rofi -dump-config \
-            | awk '\
-                /\slocation:/ { \
-                    gsub(/\/?\*\/?|;/, ""); \
-                    print $2; \
-                    exit; \
-                }'
-    )
     # Mark it in the options
     FULL_DIRECTIONS[$CURRENT_LOCATION]="${FULL_DIRECTIONS[$CURRENT_LOCATION]} (active)"
     # Print the options
@@ -43,6 +50,8 @@ function rebuild_directions {
 }
 
 function create_and_spawn_runner {
+    # Snag the current command
+    ROFI_COMMAND=$(ps --no-headers -o command -p $(cat "$ROFI_PID"))
     # Create a temp file
     new_source=$(mktemp -p $TMPDIR rofi-location-XXXX)
     # Ensure it's executable
@@ -51,26 +60,30 @@ function create_and_spawn_runner {
     cat <<EOF >$new_source
 #!/bin/bash
 
-rofi -show "$MODI_NAME"
+$ROFI_COMMAND
+rm -rf "$new_source"
 EOF
     # Spawn it in the background
     coproc "$new_source" >/dev/null
 }
 
-# No args were passed
-if [[ -z $@ ]]; then
-    rebuild_directions
 # Something was passed
-else
+if [[ ! -z $@ ]]; then
     # Parse the new location
     DESIRED_LOCATION="${1//[^0-9]/}"
-    # Check to see if location is in the proper range
-    if [[ 0 -le "$DESIRED_LOCATION" ]] && [[ 8 -ge "$DESIRED_LOCATION" ]]; then
-        # It is; update the config
-        sed --in-place='.bak' -e "s/^.*\slocation:.*$/\tlocation: $DESIRED_LOCATION;/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
-        # Create next instance
-        create_and_spawn_runner
+    if [[ "$CURRENT_LOCATION" -ne "$DESIRED_LOCATION" ]]; then
+        # Check to see if location is in the proper range
+        if [[ 0 -le "$DESIRED_LOCATION" ]] && [[ 8 -ge "$DESIRED_LOCATION" ]]; then
+            # It is; update the config
+            sed --in-place='.bak' -e "s/^.*\slocation:.*$/\tlocation: $DESIRED_LOCATION;/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+            # Create next instance
+            create_and_spawn_runner
+            exit 0
+        elif [[ 9 -eq "$DESIRED_LOCATION" ]]; then
+            exit 0
+        else
+            exit 1
+        fi
     fi
-    # Exit
-    exit 0
 fi
+rebuild_directions
