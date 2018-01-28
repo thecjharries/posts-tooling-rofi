@@ -1,0 +1,131 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post looks at changing `rofi`'s window location. It also introduces some `rofi` `dmenu` usage to handle input.
+
+{% endblock %}
+{% block content %}
+## Change Window Location
+
+By default, `rofi` launches dead-center of the owning screen.
+
+{{
+    shell_session("""\
+$ rofi -show run
+should be in the center
+""")
+}}
+
+There's a config option, `location`, that allows us to change that position. We can instead place the launcher on any of the cardinals, any of the ordinals, or dead center. The locations follow a pattern like this:
+
+{{
+    highlight_block("""\
+1 2 3
+8 0 4
+7 6 5
+""",
+        explicit_lexer_name = 'TextLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+A simple script like this takes cardinals and ordinals as input and updates the location of the main window to match.
+
+{{
+    highlight_block(
+        'scripts/location-changer',
+        blob_path = 'scripts/location-changer',
+        explicit_lexer_name = 'BashLexer',
+        title = 'location-changer',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/location-changer'
+    )
+}}
+
+It's very simple to use. Like `rofi`, it defaults to the center position.
+
+{{
+    shell_session("""\
+$ scripts/location-changer n
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-/* location: 0;*/
++   location: 2;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+{{
+    shell_session("""\
+$ scripts/location-changer east
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 2;
++   location: 4;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+{{
+    shell_session("""\
+$ scripts/location-changer qqq
+""")
+}}
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 2;
++   location: 0;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+It can also be used via `rofi`'s `dmenu` capabilities.
+
+{{
+    shell_session("""\
+$ scripts/location-changer
+...
+""")
+}}
+
+![location-changer-gui-south](/content/images/2018/01/location-changer-gui-south.png)
+
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -8 +8 @@
+-   location: 0;
++   location: 5;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+{% endblock %}
