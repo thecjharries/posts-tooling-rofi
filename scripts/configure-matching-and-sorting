@@ -123,6 +123,7 @@ def pipe_choices_to_rofi(choices, defaults_key):
         [
             'rofi',
             '-dmenu',
+            '-only-match',
             '-mesg', "%s" % MESSAGES[defaults_key],
             '-no-fixed-num-lines',
             '-width', "%d" % (len(MESSAGES[defaults_key]) + 1),
@@ -218,7 +219,7 @@ def parse_argv(args=None):
     if args is None:
         args = argv[1:]
     parser = ArgumentParser(
-        description='Installs rofi from source'
+        description="Configure rofi's matching and sorting"
     )
     parser.add_argument(
         '--skip-diff',
@@ -294,7 +295,6 @@ def cli():
         for key, value in DEFAULTS.iteritems():
             if key != options.only:
                 setattr(options, key, value)
-    print(options)
     determine_everything(options)
     if not options.skip_diff:
         review_diff()
