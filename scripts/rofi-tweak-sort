@@ -1,0 +1,319 @@
+#!/usr/bin/env python
+
+# pylint: disable=misplaced-comparison-constant,missing-docstring
+from __future__ import print_function
+
+from os import chmod, environ
+from os.path import exists, join
+from re import compile as re_compile, finditer, match, MULTILINE, VERBOSE
+from shutil import copy
+from stat import S_IRUSR, S_IWUSR, S_IXUSR, S_IRGRP, S_IXGRP, S_IROTH, S_IXOTH
+from subprocess import check_output, Popen
+from sys import argv, exit as sys_exit
+from types import StringTypes
+
+from argparse import ArgumentParser
+
+CONFIG_FILE = join(environ['XDG_USER_CONFIG_DIR'], 'rofi', 'config.rasi')
+
+BASE_OPTIONS = [
+    'set matching',
+    'set sort',
+    'set levenshtein-sort',
+    'exit'
+]
+
+MATCHING_METHODS = [
+    'fuzzy',
+    'glob',
+    'normal',
+    'regex'
+]
+
+DEFAULTS = {
+    'matching': 'normal',
+    'sort': 'true',
+    'levenshtein-sort': 'false',
+    'pid': "%s" % join(environ['XDG_RUNTIME_DIR'], "rofi.pid")
+}
+
+MATCHING_OPTIONS = []
+
+FLAG_STATES = [
+    'true',
+    'false'
+]
+
+SORT_OPTIONS = []
+
+LEVENSHTEIN_SORT_OPTIONS = []
+
+ACTIVE_CHOICE_IDENTIFIER = " (active)"
+
+CONFIG_OPTIONS_RAW_PATTERN = r"""
+^
+.*?
+\s
+(?P<option>
+    matching
+    |
+    (?:levenshtein-)?sort
+    |
+    pid
+)
+:\s*
+[\"']?
+(?P<value>
+    .*?
+)
+[\"']?;
+.*?
+$
+"""
+
+CONFIG_OPTIONS_PATTERN = re_compile(
+    CONFIG_OPTIONS_RAW_PATTERN,
+    VERBOSE | MULTILINE
+)
+
+
+def clean_exit():
+    """Exits with code 0"""
+    sys_exit(0)
+
+
+def print_and_exit(options):
+    """Dumps everything to STDOUT for rofi"""
+    for option in options:
+        print(option)
+    clean_exit()
+
+
+def spawn_and_die():
+    """Creates a new process and dies"""
+    runner = create_new_runner()
+    Popen(['bash', '-c', "coproc %s" % runner])
+    clean_exit()
+
+
+def parse_pid():
+    """Snags the original rofi command"""
+    with open(DEFAULTS['pid'], 'r') as pid_file:
+        process_id = pid_file.read().strip()
+    result = check_output(
+        [
+            'ps',
+            '--no-headers',
+            '-o', 'command',
+            '-p', "%s" % process_id
+        ]
+    )
+    return result.strip()
+
+
+def create_new_runner():
+    """Creates a new runner script"""
+    result = check_output(
+        [
+            'mktemp',
+            '-p', environ['TMPDIR'],
+            'rofi-tweak-sort-XXXX'
+        ],
+    )
+    result = result.strip()
+    root_command = parse_pid()
+    with open(result, 'w') as tempfile:
+        tempfile.write(
+            """
+            #!/bin/bash
+            %s
+            rm -rf %s
+            """ % (root_command, result)
+        )
+    chmod(result, S_IRUSR | S_IWUSR | S_IXUSR |
+          S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+    return result
+
+
+def update_config(key, value):
+    """Updates the config file"""
+    if isinstance(value, StringTypes):
+        if not match("true|false", value):
+            value = '"%s"' % value
+    check_output(
+        [
+            'sed',
+            '-i',
+            '-e',
+            r"s/^.*\s%s:.*$/\t%s: %s;/g" % (key, key, value),
+            CONFIG_FILE
+        ],
+    )
+    spawn_and_die()
+
+
+def base_options():
+    """The root options"""
+    print_and_exit(BASE_OPTIONS)
+
+
+def construct_matching_options():
+    """Constructs the options for matching"""
+    for value in MATCHING_METHODS:
+        MATCHING_OPTIONS.append(
+            'set matching %s%s' % (
+                value,
+                ACTIVE_CHOICE_IDENTIFIER
+                if value == DEFAULTS['matching']
+                else ''
+            )
+        )
+    MATCHING_OPTIONS.append('set ^')
+
+
+def set_matching_options(value=None):
+    """Sets matching options"""
+    construct_matching_options()
+    if value:
+        value = value.replace(ACTIVE_CHOICE_IDENTIFIER, "")
+    if value in MATCHING_METHODS:
+        update_config('matching', value)
+    else:
+        print_and_exit(MATCHING_OPTIONS)
+
+
+def construct_sort_options():
+    """Constructs the options for basic sorting"""
+    for value in FLAG_STATES:
+        SORT_OPTIONS.append(
+            'set sort %s%s' % (
+                value,
+                ACTIVE_CHOICE_IDENTIFIER
+                if value == DEFAULTS['sort']
+                else ''
+            )
+        )
+    SORT_OPTIONS.append('set ^')
+
+
+def set_sort_options(value=None):
+    """Sets sort options"""
+    construct_sort_options()
+    if value:
+        value = value.replace(ACTIVE_CHOICE_IDENTIFIER, "")
+    if value in FLAG_STATES:
+        update_config('sort', value)
+    else:
+        print_and_exit(SORT_OPTIONS)
+
+
+def construct_levenshtein_sort_options():  # pylint:disable=invalid-name
+    """Constructs the options for levenshtein sorting"""
+    for value in FLAG_STATES:
+        LEVENSHTEIN_SORT_OPTIONS.append(
+            'set levenshtein-sort %s%s' % (
+                value,
+                ACTIVE_CHOICE_IDENTIFIER
+                if value == DEFAULTS['levenshtein-sort']
+                else ''
+            )
+        )
+    LEVENSHTEIN_SORT_OPTIONS.append('set ^')
+
+
+def set_levenshtein_sort_options(value=None):
+    """Sets Levenshtein sort options"""
+    construct_levenshtein_sort_options()
+    if value:
+        value = value.replace(ACTIVE_CHOICE_IDENTIFIER, "")
+    if value in FLAG_STATES:
+        update_config('levenshtein-sort', value)
+    else:
+        print_and_exit(LEVENSHTEIN_SORT_OPTIONS)
+
+
+def parse_config_args(args):
+    """Parses config arguments"""
+    config_parser = ArgumentParser()
+    config_subparsers = config_parser.add_subparsers()
+    matching_parser = config_subparsers.add_parser('matching')
+    matching_parser.add_argument('value', default=None, nargs='?')
+    matching_parser.set_defaults(func=set_matching_options)
+    sort_parser = config_subparsers.add_parser('sort')
+    sort_parser.add_argument('value', default=None, nargs='?')
+    sort_parser.set_defaults(func=set_sort_options)
+    levenshtein_sort_parser = config_subparsers.add_parser(
+        'levenshtein-sort')
+    levenshtein_sort_parser.add_argument('value', default=None, nargs='?')
+    levenshtein_sort_parser.set_defaults(func=set_levenshtein_sort_options)
+    try:
+        config_options = config_parser.parse_known_args(args)[0]
+    except SystemExit:
+        config_options = None
+    if config_options:
+        config_options.func(config_options.value)
+
+
+def parse_root_args(args):
+    """Parses base level args or escalates"""
+    root_parser = ArgumentParser()
+    root_subparsers = root_parser.add_subparsers()
+    set_parser = root_subparsers.add_parser('set')
+    exit_parser = root_subparsers.add_parser('exit')
+    set_parser.set_defaults(func=base_options)
+    exit_parser.set_defaults(func=clean_exit)
+    try:
+        options, command_args = root_parser.parse_known_args(args)
+    except SystemExit:
+        return base_options()
+    parse_config_args(command_args)
+    return options.func()
+
+
+def prepare_args(args=None):
+    """Cleans the args for processing"""
+    if args is None:
+        args = argv[1:]
+    if 1 > len(args):
+        base_options()
+    else:
+        new_args = []
+        for arg in args:
+            new_args += arg.split(' ')
+        args = new_args
+    return args
+
+
+def parse_argv(args=None):
+    """Parses the input"""
+    args = prepare_args(args)
+    parse_root_args(args)
+
+
+def create_config_if_dne(raw_config):
+    """Creates a new config file if it doesn't exist"""
+    if not exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'w+') as config_file:
+            config_file.write(raw_config)
+
+
+def backup_config():
+    """Backs up the current config"""
+    copy(CONFIG_FILE, CONFIG_FILE + '.bak')
+
+
+def load_config():
+    """Loads the active rofi config"""
+    raw_config = check_output(['rofi', '-dump-config'])
+    for config_match in finditer(CONFIG_OPTIONS_PATTERN, raw_config):
+        DEFAULTS[config_match.group('option')] = config_match.group('value')
+    create_config_if_dne(raw_config)
+
+
+def cli():
+    load_config()
+    backup_config()
+    parse_argv()
+
+if '__main__' == __name__:
+    cli()
