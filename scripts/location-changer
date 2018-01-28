@@ -37,4 +37,4 @@ DESIRED_LOCATION=$(
 
 sed --in-place='.bak' -E "s/^.*\slocation:.*$/\tlocation: ${DIRECTION_INDICES[$DESIRED_LOCATION]};/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
 
-diff -U 0 "$XDG_USER_CONFIG_DIR/rofi/config.rasi"{.bak,}
+diff --color --unified=0 "$XDG_USER_CONFIG_DIR/rofi/config.rasi"{.bak,}
