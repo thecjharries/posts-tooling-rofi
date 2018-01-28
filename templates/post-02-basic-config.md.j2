@@ -38,13 +38,6 @@ $ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
 
 We've now got a super basic config file that contains every possible option (I think) commented out.
 
-{{
-    shell_session("""\
-$ rm -rf $XDG_USER_CONFIG_DIR/rofi/config*
-$ rofi -dump-config > $XDG_USER_CONFIG_DIR/rofi/config.rasi
-""")
-}}
-
 ## Script Modi Discovery
 
 If you look at the `man` page or check `rofi`'s help, you'll probably notice that not all the modis are enabled. You can also force the issue by attempting to `-show` a nonexistent modi:
