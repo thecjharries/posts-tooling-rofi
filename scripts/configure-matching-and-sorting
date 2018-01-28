@@ -294,7 +294,6 @@ def cli():
         for key, value in DEFAULTS.iteritems():
             if key != options.only:
                 setattr(options, key, value)
-    print(options)
     determine_everything(options)
     if not options.skip_diff:
         review_diff()
