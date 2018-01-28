@@ -123,6 +123,7 @@ def pipe_choices_to_rofi(choices, defaults_key):
         [
             'rofi',
             '-dmenu',
+            '-only-match',
             '-mesg', "%s" % MESSAGES[defaults_key],
             '-no-fixed-num-lines',
             '-width', "%d" % (len(MESSAGES[defaults_key]) + 1),
