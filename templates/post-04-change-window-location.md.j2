@@ -485,7 +485,7 @@ On the surface, that looks awesome. However, if you look closely, the `location`
 
 ### Process-Spawning `modi`
 
-I spent a decent chunk of time beating my head against this, and then I realized that `rofi` stores its `pid`, accessible via its `pid` config option. Spoiler alert: it does everything we need. Before I get to the exciting stuff, though, it's important to mention safety. It's a really good idea to limit your process count (somehow) in case you create a runaway script. Speaking from experience, it could be half an hour before you can free up enough memory to switch to another `tty` and kill everything.
+I spent a decent chunk of time beating my head against this, and then I realized that `rofi` stores its `pid`. We can access the `pid` file via the config, which in turn gives us access to all the information we need. Before I get to the exciting stuff, though, it's important to mention safety. It's a really good idea to limit your process count (somehow) in case you create a runaway script. Speaking from experience, it could be half an hour before you can free up enough memory to switch to another `tty` and kill everything.
 
 {{
     highlight_block("""\
