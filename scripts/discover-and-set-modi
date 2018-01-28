@@ -1,0 +1,52 @@
+#!/bin/bash
+
+CONFIG_FILE="$XDG_USER_CONFIG_DIR/rofi/config.rasi"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    rofi -dump-config > "$CONFIG_FILE"
+fi
+
+DISCOVERED_MODI=$(
+    rofi --help \
+        | awk '
+            BEGIN {
+                modi = "";
+                grabbing = 0;
+            }
+            /Detected modi/ {
+                grabbing = 1;
+                next;
+            }
+            !grabbing {
+                next;
+            }
+            grabbing && !NF {
+                exit;
+            }
+            grabbing {
+                gsub("+","");
+                modi = $2","modi;
+            }
+            END {
+                print gensub(",$","","g",modi);
+            }'
+)
+
+awk -i inplace \
+    -v INPLACE_SUFFIX='.bak' \
+    -v MODI="$DISCOVERED_MODI" \
+    '
+    /\smodi:/ {
+        print "\tmodi: \""MODI"\";";
+        next;
+    }
+    /combi-modi:/ {
+        print "\tcombi-modi: \""gensub("combi,?", "", "g", MODI)"\";";
+        next;
+    }
+    {
+        print;
+    }' \
+    "$CONFIG_FILE"
+
+diff --color --unified=0 "$CONFIG_FILE"{.bak,}

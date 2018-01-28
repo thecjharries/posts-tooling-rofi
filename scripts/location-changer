@@ -1,0 +1,90 @@
+#!/bin/bash
+
+CURRENT_LOCATION=$(
+    rofi -dump-config \
+        | awk '\
+            /\slocation:/ { \
+                gsub(/\/?\*\/?|;/, ""); \
+                print $2; \
+                exit; \
+            }'
+)
+
+FULL_DIRECTIONS=(
+    '0 Center'
+    '1 Northwest'
+    '2 North'
+    '3 Northeast'
+    '4 East'
+    '5 Southeast'
+    '6 South'
+    '7 Southwest'
+    '8 West'
+)
+
+DIRECTIONS=(c n{w,,e} e s{e,,w} w)
+declare -A DIRECTION_INDICES
+
+for index in "${!DIRECTIONS[@]}"; do
+    key="${DIRECTIONS[$index]}"
+    DIRECTION_INDICES[$key]=$index
+    full_string="${FULL_DIRECTIONS[$index]}"
+    if [[ $CURRENT_LOCATION -eq "${full_string//[^0-9]/}" ]]; then
+        first_direction="${FULL_DIRECTIONS[0]}"
+        FULL_DIRECTIONS[$index]="$first_direction"
+        FULL_DIRECTIONS[0]="${FULL_DIRECTIONS[$index]} (active)"
+    fi
+done
+
+if [[ -n "$1" ]]; then
+    INPUT="$1"
+    DESIRED_LOCATION_INDEX=$(
+        echo $INPUT \
+            | awk ' \
+                { \
+                    input = tolower($1); \
+                    input = gensub(/[^a-z]/, "", "g", input); \
+                    where = match(input, /^([ns])(o[ru]th)?/, cardinal); \
+                    if (where != 0) { \
+                        result = cardinal[1]; \
+                        input = gensub(/^([ns])(o[ru]th)?/, "", "g", input); \
+                    } else { \
+                        result = ""; \
+                    } \
+                    where = match(input, /^([ew])([ae]st)?/, cardinal); \
+                    if (where != 0) { \
+                        result = result""cardinal[1]; \
+                    } \
+                    if ("" == result) { \
+                        result = "c"; \
+                    } \
+                } \
+                END { \
+                    print result; \
+                }'
+    )
+    DESIRED_LOCATION="${DIRECTION_INDICES[$DESIRED_LOCATION_INDEX]}"
+else
+    INPUT=$(
+        printf '%s\n' "${FULL_DIRECTIONS[@]}" \
+            | rofi \
+                -dmenu \
+                -mesg 'choose location' \
+                -no-fixed-num-lines \
+                -width 20 \
+                -hide-scrollbar \
+                -theme-str '#inputbar { children: [entry,case-indicator]; }' \
+                -theme-str '#listview { dynamic: true; }' \
+                -theme-str '#mainbox { children: [message,inputbar,listview]; }' \
+                -theme-str '#message { border: 0; background-color: @selected-normal-background; text-color: @selected-normal-foreground; }' \
+                -theme-str '#textbox { text-color: inherit; }'
+    )
+    if [[ -z "$INPUT" ]]; then
+        exit 0
+    fi
+    DESIRED_LOCATION="${INPUT//[^0-9]/}"
+fi
+
+sed --in-place='.bak' -E "s/^.*\slocation:.*$/\tlocation: $DESIRED_LOCATION;/g" $XDG_USER_CONFIG_DIR/rofi/config.rasi
+
+diff --color --unified=0 "$XDG_USER_CONFIG_DIR/rofi/config.rasi"{.bak,}

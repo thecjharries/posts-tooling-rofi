@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -x
+
+OPTIONS='1000
+000
+100
+0000
+1001'
+
+MATCHING=(normal regex glob fuzzy)
+FLAG_STATES=('-no' '')
+
+SLEEP_TIME=0.25
+
+function run_dmenu {
+    echo "$OPTIONS" | eval "rofi -dmenu -no-lazy-grab -theme-str '#inputbar{children: [entry,case-indicator];}' -hide-scrollbar -width 6 -lines 5 -matching $1 $2-sort $3-levenshtein-sort" &
+}
+
+function move_screenshot {
+    SCREENSHOT=$(find ~/Pictures -name 'rofi*' -exec ls -t {} + | head -1)
+    mv "$SCREENSHOT" "$HOME/Pictures/matching-$1$2-sort$3-levenshstein-sort.png"
+}
+
+function ghost_keys {
+    sleep $SLEEP_TIME
+    xdotool key 0 key 0
+    sleep $SLEEP_TIME
+    xdotool key alt+shift+s
+    sleep $SLEEP_TIME
+    xdotool key Escape
+    sleep $SLEEP_TIME
+}
+
+function execute_stage {
+    run_dmenu "$1" "$2" "$3"
+    ghost_keys
+    move_screenshot "$1" "$2" "$3"
+}
+
+for matching_state in "${MATCHING[@]}"; do
+    for sort_state in "${FLAG_STATES[@]}"; do
+        for levenshstein_state in "${FLAG_STATES[@]}"; do
+            execute_stage "$matching_state" "$sort_state" "$levenshstein_state"
+        done
+    done
+done
