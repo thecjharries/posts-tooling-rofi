@@ -62,7 +62,7 @@ $ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
 However, the `matching` method is very much situational. `normal` should work most of the time. `fuzzy` might be better, but I don't have any metrics so I'm not sure how it affects performance and all that. `glob` is amazing when moving files around, but might not be very useful when attempting to `drun`. You could always run `regex` but then no one else would want to read your scripts and you'd turn to a life of blogging like me.
 
 
-### (Yet Another) `rofi` Options Script
+## (Yet Another) `rofi` Options Script
 
 I slapped together a quick script to handle matching and sorting.
 
@@ -98,6 +98,7 @@ I tried to make this easy. To use the existing config, just add the pertinent fl
 $ scripts/configure-matching-and-sorting -m -s -l
 """)
 }}
+
 {{
     highlight_block("""\
 --- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
@@ -163,7 +164,7 @@ $ scripts/configure-matching-and-sorting -o matching
     )
 }}
 
-#### Full Script
+### Full Script
 
 {{
     highlight_block(
@@ -173,6 +174,44 @@ $ scripts/configure-matching-and-sorting -o matching
         title = 'configure-matching-and-sorting',
         external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/configure-matching-and-sorting'
     )
+}}
+
+## Change Matching and Sorting Via a `modi`
+
+After [the last post's `modi`](https://blog.wizardsoftheweb.pro/rofi-change-window-location/#locationchangermodi), I wanted to see if I could repeat something similar here. This script is still pretty raw, but it gets the job done. Total GUI, like before.
+
+{{
+    highlight_block(
+        'scripts/rofi-tweak-sort',
+        blob_path = 'scripts/rofi-tweak-sort',
+        explicit_lexer_name = 'PythonLexer',
+        title = 'rofi-tweak-sort',
+        external_source_link = 'https://github.com/thecjharries/posts-tooling-rofi/blob/master/scripts/rofi-tweak-sort'
+    )
+}}
+
+As before, I'd recommend actually installing this to a common location.
+
+{{
+    shell_session("""\
+$ mkdir -p $XDG_USER_CONFIG_DIR/rofi/scripts
+$ cp scripts/rofi-tweak-sort $XDG_USER_CONFIG_DIR/rofi/scripts/tweak-sort
+$ awk \\
+    -i inplace \\
+    -v INPLACE_SUFFIX='.bak' \\
+    -v MODI=\"tweak-sort:$XDG_USER_CONFIG_DIR/rofi/scripts/tweak-sort\" \\
+    ' \\
+    match($0, /\s(combi-)?modi:[^\"]*\"([^\"]*)\"/, option) { \\
+        current_modi = gensub(/tweak-sort:[^,]*/, \"\", \"g\", option[2]); \\
+        final_modi = MODI\",\"current_modi; \\
+        printf \"\\t%smodi: \\\"%s\\\";\\n\", option[1], gensub(/,+/, \",\", \"g\", final_modi); \\
+        next; \\
+    } \\
+    { \\
+        print; \\
+    }' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+""")
 }}
 
 {% endblock %}
