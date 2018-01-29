@@ -48,6 +48,16 @@ $ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
     )
 }}
 
+The shortcuts are also useful to know.
+
+{{
+    shell_session("""\
+$ rofi -dump-config | grep kb-mode
+    kb-mode-next: \"Shift+Right,Control+Tab\";
+    kb-mode-previous: \"Shift+Left,Control+ISO_Left_Tab\";
+""")
+}}
+
 ## `sidebar-mode`
 
 Another useful cycling option is `sidebar-mode`. By default, the main window gives no notification of its `modi`.
