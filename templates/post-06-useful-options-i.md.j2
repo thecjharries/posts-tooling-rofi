@@ -7,6 +7,19 @@ This post highlights several useful `rofi` options. I don't try to script anythi
 {% block content %}
 ## `combi`
 
+The `combi` `modi` is, depending on your perspective, very useful or very intimidating. It combines the options from everything in its list, making it easy to look at several things without leaving the window.
+
+At the moment, I have mine set to everything I have enabled. A nice thing about `rofi` is that it's very easy to swap out config on the fly, so I could quick run `combi` on a smaller set of of my `modi`.
+
+{{
+    shell_session("""\
+$ rofi -show combi -combi-modi \"drun,ssh\"
+as opposed to
+$ rofi -dump-config | grep combi-modi:
+    combi-modi: \"file_browser,top,myplugin,keys,drun,ssh,run,windowcd,window\";
+""")
+}}
+
 ## Cycling `modi`
 
 Being able to switch between enabled `modi` makes `rofi` a very useful tool. Cycling should be on by default, but it never hurts to forcibly enable it.
