@@ -1,0 +1,72 @@
+{% extends 'base.md.j2' %}
+{% block lead_paragraph %}
+
+This post covers a super-useful feature of `rofi`, the `combi` mode, as well as several related options.
+
+{% endblock %}
+{% block content %}
+## `combi`
+
+## Cycling `modi`
+
+Being able to switch between enabled `modi` makes `rofi` a very useful tool. Cycling should be on by default, but it never hurts to forcibly enable it.
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    -E 's/^.*\\scycle:.*$/\\tcycle: true;/g' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -28 +28 @@
+-/* cycle: true;*/
++   cycle: true;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+## `sidebar-mode`
+
+Another useful cycling option is `sidebar-mode`. By default, the main window gives no notification of its `modi`.
+
+![basic-config-without-sidebar](/content/images/2018/01/basic-config-without-sidebar.png)
+
+However, in `sidebar-mode`, `rofi` adds a `modi` bar that shows the active `modi` and lists other available `modi` in the current session. It also adds mouse interaction on top of the `kb-mode-*` shortcuts.
+
+![basic-config-with-sidebar](/content/images/2018/01/basic-config-with-sidebar.png)
+
+{{
+    shell_session("""\
+$ sed \\
+    --in-place='.bak' \\
+    -E 's/^.*\\ssidebar-mode:.*$/\\tsidebar-mode: true;/g' \\
+    $XDG_USER_CONFIG_DIR/rofi/config.rasi
+$ diff --color --unified=0 \"$XDG_USER_CONFIG_DIR/rofi/config.rasi\"{.bak,}
+""")
+}}
+{{
+    highlight_block("""\
+--- $XDG_USER_CONFIG_DIR/rofi/config.rasi.bak
++++ $XDG_USER_CONFIG_DIR/rofi/config.rasi
+@@ -29 +29 @@
+-/* sidebar-mode: false;*/
++   sidebar-mode: true;
+""",
+        explicit_lexer_name = 'DiffLexer',
+        linenos = False,
+        no_header = True
+    )
+}}
+
+{% endblock %}
+{% block content %}
+{% endblock %}
