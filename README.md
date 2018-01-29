@@ -14,7 +14,8 @@ $ find . \( -path './templates*' -o -path './scripts/*' \) -type f | xargs wc --
   304   651  8139  8139    80 ./scripts/configure-matching-and-sorting
    89   258  2244  2244   129 ./scripts/rofi-location-changer
    90   254  2858  2858   142 ./scripts/location-changer
-    3    19   161   161   151 ./templates/includes/code.j2
+   97   364  2965  2965   209 ./templates/post-06-useful-options-i.md.j2
+    3    19   158   158   148 ./templates/includes/code.j2
     9    14   139   139    42 ./templates/includes/front_matter.j2
    14    29   259   259    49 ./templates/includes/shell_session.j2
    14    98   673   673   308 ./templates/includes/assumptions.j2
@@ -25,6 +26,6 @@ $ find . \( -path './templates*' -o -path './scripts/*' \) -type f | xargs wc --
   628  2274 18486 18486   530 ./templates/post-04-change-window-location.md.j2
   314  1212  9855  9855   392 ./templates/post-01-overview-and-installation.md.j2
    90   287  2544  2544   243 ./templates/post-02-basic-config.md.j2
- 2979  9391 86471 86471   875 total
+ 3076  9755 89433 89433   875 total
 ```
 <!-- END RAW WC -->
